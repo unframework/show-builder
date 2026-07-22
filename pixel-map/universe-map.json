@@ -1,0 +1,303 @@
+{
+  "_notes": [
+    "Canonical sACN/E1.31 universe and channel assignments for all Gothic Folly LED zones.",
+    "All pixels are RGB (3 channels each). 510 channels max per universe.",
+    "Redesigned 2026-06-29: all zones now use contiguous per-port streams.",
+    "2026-07-12: major arches went full-resolution and moved to the tail (u39–u48); u3–u6 vacated. Interior orbs cut from the design entirely (u49 now free).",
+    "",
+    "ROSE WINDOW — u1 (Rose Window A, petals 1–8) + u2 (Rose Window B, petals 9–16)",
+    "  Each half: 8 petals × 14 cells × 3ch = 336ch, fits in one universe.",
+    "  Ports 33–34 → u1; ports 35–36 → u2.",
+    "  Note: these are the DESIGN-level (cell) universes; physical rose-window LEDs are",
+    "  driven by an expanded FSEQ (see shows.md). xLights model split A/B pending — issue #21.",
+    "",
+    "MAJOR ARCHES — u39–u48 (ports 29–32, SRx2 standalone) — FULL RESOLUTION (2026-07-12)",
+    "  Each arch is every addressable WS2811 pixel (~216–233 px), not 20 grouped show-pixels.",
+    "  Each arch gets its own 2-universe block: A u39–40, B u41–42, C u43–44, D u45–46, E u47–48.",
+    "  Old u3–u6 are VACATED. Counts provisional pending crown-overshoot measurement.",
+    "",
+    "MINOR ARCHES LEFT — u7–u11 (ports 21–24, SRx2 standalone)",
+    "  Arch 1 (134px=402ch) and arch 5 (90px) share u7 (arch 5 starts at ch403, spans into u8).",
+    "  Arches 2–4: u9, u10, u11.",
+    "",
+    "MINOR ARCHES RIGHT — u12–u16 (ports 25–28, SRx2 standalone)",
+    "  Same structure as left. Arch 1+5 share u12 (u13 overflow), arches 2–4: u14, u15, u16.",
+    "",
+    "TOWER ZONES — u50–u75 (ports 5–20, chained SRs) — RELOCATED + CHAINED QUADS (2026-07-12, issue #76)",
+    "  Was u17–u38. Each QUAD is now ONE chained data string on ONE SR output (Front→Left→Back→Right,",
+    "  pixel 0 = front right foot), folded into the spire/canopy port streams. Streams flow across",
+    "  universe boundaries (no null padding). Spire/spirelet/canopy at low ch, chained quad after.",
+    "",
+    "  Port 5  (FR, u50–52): spire 1–4 (ch1) + CHAINED QUAD FTR 5E (ch157, 340px)",
+    "  Port 6  (FR, u53):     spire 5–8 (ch1) + spirelet FR-6 6E (ch157)",
+    "  Port 7  (FR, u54):     spirelets FR-1/2/3/4 (ch1) + spirelet FR-5 7E (ch13)",
+    "  Port 8  (FR, u55):     wash (reserved) 8E",
+    "  Port 9  (FL, u56–58): spire 1–4 (ch1) + CHAINED QUAD FTL 9E (ch157, 340px)",
+    "  Port 10 (FL, u59):     spire 5–8 (ch1) + spirelet FL-1 10E (ch157)",
+    "  Port 11 (FL, u60):     spirelets FL-3/4 (ch1) + spirelet FL-2 11E (ch7)",
+    "  Port 12 (FL, u61):     spirelets FL-5/6 (ch1) + wash (reserved) 12E",
+    "  Port 13 (BL, u62–64): spire 1–4 (ch1) + CHAINED QUAD back-bottom-left 13E (ch157, 332px)",
+    "  Port 14 (BL, u65):     spire 5–8 (ch1)",
+    "  Port 15 (BL, u66):     spirelets BL-1/2/3/4 (ch1)",
+    "  Port 16 (BL, u67–68): canopy runs (ch1) + CHAINED QUAD back-top-left 16D (ch379, 176px)",
+    "  Port 17 (BR, u69–71): spire 1–4 (ch1) + CHAINED QUAD back-bottom-right 17E (ch157, 332px)",
+    "  Port 18 (BR, u72):     spire 5–8 (ch1)",
+    "  Port 19 (BR, u73):     spirelets BR-1/2/3/4 (ch1)",
+    "  Port 20 (BR, u74–75): canopy runs (ch1) + CHAINED QUAD back-top-right 20D (ch379, 176px)",
+    "",
+    "sACN multicast: universe U → 239.255.0.U",
+    "Development: point controller at relay IP → relay forwards to browser sim.",
+    "Production: point controller at F48V5 IP (same universes/channels)."
+  ],
+  "f48v5_outputs": {
+    "rose_window_A": "u1 (petals 1–8, ports 33–34) — design/cell level; physical LEDs via expanded FSEQ (see shows.md)",
+    "rose_window_B": "u2 (petals 9–16, ports 35–36) — design/cell level; physical LEDs via expanded FSEQ",
+    "arches": "u39–u48 (ports 29–32) — full resolution (~216–233 px/arch, 2 universes each)",
+    "arches_mini_left": "u7–u11 (ports 21–24)",
+    "arches_mini_right": "u12–u16 (ports 25–28)",
+    "towers": "u50–u75 (ports 5–20) — spires/spirelets/canopy + chained quads",
+    "vacated": "u3–u6 (former 20-px major arches), u17–u38 (former tower block, relocated to u50–u75), u49 (former orbs) — free for future zones (e.g. wash floodlights, TBD)",
+    "used": "u1–u2, u7–u16, u39–u48, u50–u75",
+    "controller_universe_capacity": 192,
+    "note": "2026-07-12: major arches full-res → u39–u48; interior orbs cut (u49 free); QUAD RE-ARCHITECTURE (issue #76) — each quad chained to one SR output, towers relocated u17–u38 → u50–u75 (u17–u38 now free). Rose-window physical-pixel expansion (~49 universes) then lives u76–~u124; ~68 free above. F48V5 supports 192 universes (the '48' is the differential port count, not a universe cap)."
+  },
+  "zones": {
+    "rose_window": {
+      "universes": "u1–u2",
+      "universe_start": 1,
+      "universe_end": 2,
+      "passthrough": true,
+      "total_pixels": 224,
+      "pixels_per_universe": 112,
+      "channels_per_universe": 336,
+      "leds_per_pixel": 1,
+      "strip": "WS2815 12V 60/m IP65",
+      "receiver": "SRx4 in front-right tower at rose window elevation (16 outputs)",
+      "note": "Rose Window A (petals 1–8, right side, 12:00–5:15) in u1; Rose Window B (petals 9–16, left side, 6:00–11:15) in u2. Model split pending xLights update (issue #21).",
+      "cell_order": [
+        "1b",
+        "2a",
+        "2c",
+        "3b",
+        "4a",
+        "4c",
+        "5a",
+        "5b",
+        "5c",
+        "6a",
+        "6c",
+        "7a",
+        "7b",
+        "7c"
+      ],
+      "universes_detail": [
+        {
+          "universe": 1,
+          "label": "Rose Window A — petals 1–8 (right side, 12:00–5:15)",
+          "petals": "1–8",
+          "start_ch": 1,
+          "total_pixels": 112,
+          "total_channels": 336
+        },
+        {
+          "universe": 2,
+          "label": "Rose Window B — petals 9–16 (left side, 6:00–11:15)",
+          "petals": "9–16",
+          "start_ch": 1,
+          "total_pixels": 112,
+          "total_channels": 336
+        }
+      ]
+    },
+    "arches": {
+      "universes": "u39–u48",
+      "universe_start": 39,
+      "universe_end": 48,
+      "passthrough": true,
+      "strip": "WS2811 24V 60/m",
+      "leds_per_meter": 60,
+      "leds_per_pixel": 6,
+      "pixels_per_meter": 10,
+      "resolution": "full (one addressable pixel per node; 20-show-pixel grouping abandoned 2026-07-12)",
+      "receiver": "SRx2 at right foot of arch 3 (ports 29–32); arch 5 on port 29 sub-address +1",
+      "note": "FULL-RESOLUTION as of 2026-07-12: each arch is now every addressable WS2811 pixel (~216–233 px), not 20 grouped show-pixels. Arches relocated to the tail of the universe map; each arch gets its own 2-universe block, entering at ch1 of its first universe and flowing across the boundary (tower-style). Old u3–u6 are VACATED. Per-arch (provisional counts — crown-overshoot pixels pending measurement, see process_notes.md 2026-07-12): Arch 1 = 233px, port 29, u39(170px)+u40(63px); Arch 2 = 229px, port 30, u41(170px)+u42(59px); Arch 3 = 223px, port 31, u43(170px)+u44(53px); Arch 4 = 219px, port 32, u45(170px)+u46(49px); Arch 5 = 216px, port 29(+1), u47(170px)+u48(46px). Pixel 0 = right foot (data entry). Regenerate arch-led-positions.json + xmodels after finalizing overshoot.",
+      "totals": {
+        "total_pixels": 1120,
+        "universes_used": 10,
+        "counts_provisional": true
+      },
+      "universes_detail": [
+        { "universe": 39 },
+        { "universe": 40 },
+        { "universe": 41 },
+        { "universe": 42 },
+        { "universe": 43 },
+        { "universe": 44 },
+        { "universe": 45 },
+        { "universe": 46 },
+        { "universe": 47 },
+        { "universe": 48 }
+      ]
+    },
+    "arches_mini_left": {
+      "universes": "u7–u11",
+      "universe_start": 7,
+      "universe_end": 11,
+      "passthrough": true,
+      "strip": "WS2811 24V 60/m",
+      "leds_per_meter": 60,
+      "leds_per_pixel": 6,
+      "receiver": "SRx2 at right foot of arch 3, left wall (ports 21–24)",
+      "note": "Arch 1 and arch 5 share u7 (arch 1 ch1, 134px=402ch; arch 5 ch403, 90px — spans into u8).",
+      "totals": {
+        "total_pixels": 550,
+        "universes_used": 5
+      },
+      "universes_detail": [
+        {
+          "universe": 7,
+          "arch_id": 1,
+          "label": "Arch Mini Left 1 (front-most, largest)",
+          "f48v5_port": 21,
+          "start_ch": 1,
+          "total_pixels": 134,
+          "total_channels": 402
+        },
+        {
+          "universe": 9,
+          "arch_id": 2,
+          "label": "Arch Mini Left 2",
+          "f48v5_port": 22,
+          "start_ch": 1,
+          "total_pixels": 120,
+          "total_channels": 360
+        },
+        {
+          "universe": 10,
+          "arch_id": 3,
+          "label": "Arch Mini Left 3 (middle)",
+          "f48v5_port": 23,
+          "start_ch": 1,
+          "total_pixels": 108,
+          "total_channels": 324
+        },
+        {
+          "universe": 11,
+          "arch_id": 4,
+          "label": "Arch Mini Left 4",
+          "f48v5_port": 24,
+          "start_ch": 1,
+          "total_pixels": 98,
+          "total_channels": 294
+        },
+        {
+          "universe": 7,
+          "arch_id": 5,
+          "label": "Arch Mini Left 5 (back-most, smallest)",
+          "f48v5_port": 21,
+          "start_ch": 403,
+          "total_pixels": 90,
+          "total_channels": 270,
+          "note": "Shares u7 with arch 1; spans into u8"
+        },
+        {
+          "universe": 8,
+          "arch_id": 5,
+          "label": "Arch Mini Left 5 overflow (last 54px into u8)",
+          "f48v5_port": 21,
+          "start_ch": 1,
+          "total_pixels": 54,
+          "total_channels": 162
+        }
+      ]
+    },
+    "arches_mini_right": {
+      "universes": "u12–u16",
+      "universe_start": 12,
+      "universe_end": 16,
+      "passthrough": true,
+      "strip": "WS2811 24V 60/m",
+      "leds_per_meter": 60,
+      "leds_per_pixel": 6,
+      "receiver": "SRx2 at right foot of arch 3, right wall (ports 25–28)",
+      "note": "Same structure as left. Arch 1+5 share u12 (arch 5 starts ch403, spans into u13).",
+      "totals": {
+        "total_pixels": 550,
+        "universes_used": 5
+      },
+      "universes_detail": [
+        {
+          "universe": 12,
+          "arch_id": 1,
+          "label": "Arch Mini Right 1 (front-most, largest)",
+          "f48v5_port": 25,
+          "start_ch": 1,
+          "total_pixels": 134,
+          "total_channels": 402
+        },
+        {
+          "universe": 14,
+          "arch_id": 2,
+          "label": "Arch Mini Right 2",
+          "f48v5_port": 26,
+          "start_ch": 1,
+          "total_pixels": 120,
+          "total_channels": 360
+        },
+        {
+          "universe": 15,
+          "arch_id": 3,
+          "label": "Arch Mini Right 3 (middle)",
+          "f48v5_port": 27,
+          "start_ch": 1,
+          "total_pixels": 108,
+          "total_channels": 324
+        },
+        {
+          "universe": 16,
+          "arch_id": 4,
+          "label": "Arch Mini Right 4",
+          "f48v5_port": 28,
+          "start_ch": 1,
+          "total_pixels": 98,
+          "total_channels": 294
+        },
+        {
+          "universe": 12,
+          "arch_id": 5,
+          "label": "Arch Mini Right 5 (back-most, smallest)",
+          "f48v5_port": 25,
+          "start_ch": 403,
+          "total_pixels": 90,
+          "total_channels": 270,
+          "note": "Shares u12 with arch 1; spans into u13"
+        },
+        {
+          "universe": 13,
+          "arch_id": 5,
+          "label": "Arch Mini Right 5 overflow (last 54px into u13)",
+          "f48v5_port": 25,
+          "start_ch": 1,
+          "total_pixels": 54,
+          "total_channels": 162
+        }
+      ]
+    },
+    "towers": {
+      "universes": "u50–u75",
+      "universe_start": 50,
+      "universe_end": 75,
+      "passthrough": true,
+      "note": "Per-port streams for all 4 towers: spires, spirelets, canopy, and CHAINED quad arches (each quad = one data string on one SR output — 2026-07-12 re-architecture, issue #76). Relocated u17–u38 → u50–u75 to fold the chained quads into the spire/canopy ports without colliding with the major arches (u39–u48). Multiple pixel types share each port stream; sim reads pixel positions from individual JSON files. Port→universe: FR p5=u50-52, p6=u53, p7=u54, p8=u55(wash); FL p9=u56-58, p10=u59, p11=u60, p12=u61(wash); BL p13=u62-64, p14=u65, p15=u66, p16=u67-68; BR p17=u69-71, p18=u72, p19=u73, p20=u74-75. Chained quads: FTR 5E=u50ch157, FTL 9E=u56ch157, BBL 13E=u62ch157, BBR 17E=u69ch157, BTL 16D=u67ch379, BTR 20D=u74ch379.",
+      "universes_detail": [
+        { "universe": 50 }, { "universe": 51 }, { "universe": 52 }, { "universe": 53 },
+        { "universe": 54 }, { "universe": 55 }, { "universe": 56 }, { "universe": 57 },
+        { "universe": 58 }, { "universe": 59 }, { "universe": 60 }, { "universe": 61 },
+        { "universe": 62 }, { "universe": 63 }, { "universe": 64 }, { "universe": 65 },
+        { "universe": 66 }, { "universe": 67 }, { "universe": 68 }, { "universe": 69 },
+        { "universe": 70 }, { "universe": 71 }, { "universe": 72 }, { "universe": 73 },
+        { "universe": 74 }, { "universe": 75 }
+      ]
+    }
+  }
+}

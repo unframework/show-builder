@@ -1,0 +1,337 @@
+{
+  "note": "Each spirelet has its own (universe, universe_start_channel) interleaved in its tower port stream.",
+  "total_pixels": 20,
+  "total_channels": 60,
+  "corners": [
+    {
+      "corner": "front-left",
+      "n_pixels": 6,
+      "universe_start_channel": 157,
+      "pixel_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "corner": "front-right",
+      "n_pixels": 6,
+      "universe_start_channel": 1,
+      "pixel_indices": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "corner": "back-left",
+      "n_pixels": 4,
+      "universe_start_channel": 1,
+      "pixel_indices": [
+        12,
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "corner": "back-right",
+      "n_pixels": 4,
+      "universe_start_channel": 1,
+      "pixel_indices": [
+        16,
+        17,
+        18,
+        19
+      ]
+    }
+  ],
+  "pixels": [
+    {
+      "pixel_index": 0,
+      "label": "FL-1",
+      "corner": "front-left",
+      "corner_index": 0,
+      "obj_name": "Object.1714",
+      "universe": 59,
+      "universe_start_channel": 157,
+      "position": [
+        -10.9562,
+        8.6182,
+        -8.8287
+      ]
+    },
+    {
+      "pixel_index": 1,
+      "label": "FL-2",
+      "corner": "front-left",
+      "corner_index": 1,
+      "obj_name": "Object.1709",
+      "universe": 60,
+      "universe_start_channel": 7,
+      "position": [
+        -6.2419,
+        8.6182,
+        -8.9586
+      ]
+    },
+    {
+      "pixel_index": 2,
+      "label": "FL-3",
+      "corner": "front-left",
+      "corner_index": 2,
+      "obj_name": "Object.1710",
+      "universe": 60,
+      "universe_start_channel": 1,
+      "position": [
+        -8.6362,
+        12.5608,
+        -6.4812
+      ]
+    },
+    {
+      "pixel_index": 3,
+      "label": "FL-4",
+      "corner": "front-left",
+      "corner_index": 3,
+      "obj_name": "Object.1711",
+      "universe": 60,
+      "universe_start_channel": 4,
+      "position": [
+        -8.6591,
+        12.5608,
+        -4.1535
+      ]
+    },
+    {
+      "pixel_index": 4,
+      "label": "FL-5",
+      "corner": "front-left",
+      "corner_index": 4,
+      "obj_name": "Object.1712",
+      "universe": 61,
+      "universe_start_channel": 1,
+      "position": [
+        -11.0984,
+        12.5608,
+        -4.1002
+      ]
+    },
+    {
+      "pixel_index": 5,
+      "label": "FL-6",
+      "corner": "front-left",
+      "corner_index": 5,
+      "obj_name": "Object.1713",
+      "universe": 61,
+      "universe_start_channel": 4,
+      "position": [
+        -11.0177,
+        12.5608,
+        -6.4315
+      ]
+    },
+    {
+      "pixel_index": 6,
+      "label": "FR-1",
+      "corner": "front-right",
+      "corner_index": 0,
+      "obj_name": "Object.1707",
+      "universe": 54,
+      "universe_start_channel": 1,
+      "position": [
+        -11.0177,
+        12.5608,
+        5.7083
+      ]
+    },
+    {
+      "pixel_index": 7,
+      "label": "FR-2",
+      "corner": "front-right",
+      "corner_index": 1,
+      "obj_name": "Object.1706",
+      "universe": 54,
+      "universe_start_channel": 4,
+      "position": [
+        -11.0984,
+        12.5608,
+        3.3769
+      ]
+    },
+    {
+      "pixel_index": 8,
+      "label": "FR-3",
+      "corner": "front-right",
+      "corner_index": 2,
+      "obj_name": "Object.1705",
+      "universe": 54,
+      "universe_start_channel": 7,
+      "position": [
+        -8.6591,
+        12.5608,
+        3.4303
+      ]
+    },
+    {
+      "pixel_index": 9,
+      "label": "FR-4",
+      "corner": "front-right",
+      "corner_index": 3,
+      "obj_name": "Object.1704",
+      "universe": 54,
+      "universe_start_channel": 10,
+      "position": [
+        -8.6362,
+        12.5608,
+        5.7579
+      ]
+    },
+    {
+      "pixel_index": 10,
+      "label": "FR-5",
+      "corner": "front-right",
+      "corner_index": 4,
+      "obj_name": "Object.1703",
+      "universe": 54,
+      "universe_start_channel": 13,
+      "position": [
+        -6.2419,
+        8.6182,
+        8.2353
+      ]
+    },
+    {
+      "pixel_index": 11,
+      "label": "FR-6",
+      "corner": "front-right",
+      "corner_index": 5,
+      "obj_name": "Object.1708",
+      "universe": 53,
+      "universe_start_channel": 157,
+      "position": [
+        -10.9562,
+        8.6182,
+        8.1055
+      ]
+    },
+    {
+      "pixel_index": 12,
+      "label": "BL-1",
+      "corner": "back-left",
+      "corner_index": 0,
+      "obj_name": "Object.1516",
+      "universe": 66,
+      "universe_start_channel": 1,
+      "position": [
+        11.8266,
+        8.6533,
+        -8.8699
+      ]
+    },
+    {
+      "pixel_index": 13,
+      "label": "BL-2",
+      "corner": "back-left",
+      "corner_index": 1,
+      "obj_name": "Object.1513",
+      "universe": 66,
+      "universe_start_channel": 4,
+      "position": [
+        14.2082,
+        8.6533,
+        -8.9196
+      ]
+    },
+    {
+      "pixel_index": 14,
+      "label": "BL-3",
+      "corner": "back-left",
+      "corner_index": 2,
+      "obj_name": "Object.1514",
+      "universe": 66,
+      "universe_start_channel": 7,
+      "position": [
+        14.1853,
+        8.6533,
+        -6.5919
+      ]
+    },
+    {
+      "pixel_index": 15,
+      "label": "BL-4",
+      "corner": "back-left",
+      "corner_index": 3,
+      "obj_name": "Object.1515",
+      "universe": 66,
+      "universe_start_channel": 10,
+      "position": [
+        11.746,
+        8.6533,
+        -6.5386
+      ]
+    },
+    {
+      "pixel_index": 16,
+      "label": "BR-1",
+      "corner": "back-right",
+      "corner_index": 0,
+      "obj_name": "Object.1512",
+      "universe": 73,
+      "universe_start_channel": 1,
+      "position": [
+        11.8266,
+        8.6533,
+        5.7605
+      ]
+    },
+    {
+      "pixel_index": 17,
+      "label": "BR-2",
+      "corner": "back-right",
+      "corner_index": 1,
+      "obj_name": "Object.1509",
+      "universe": 73,
+      "universe_start_channel": 4,
+      "position": [
+        14.2082,
+        8.6533,
+        5.7108
+      ]
+    },
+    {
+      "pixel_index": 18,
+      "label": "BR-3",
+      "corner": "back-right",
+      "corner_index": 2,
+      "obj_name": "Object.1510",
+      "universe": 73,
+      "universe_start_channel": 7,
+      "position": [
+        14.1853,
+        8.6533,
+        8.0385
+      ]
+    },
+    {
+      "pixel_index": 19,
+      "label": "BR-4",
+      "corner": "back-right",
+      "corner_index": 3,
+      "obj_name": "Object.1511",
+      "universe": 73,
+      "universe_start_channel": 10,
+      "position": [
+        11.746,
+        8.6533,
+        8.0918
+      ]
+    }
+  ]
+}
