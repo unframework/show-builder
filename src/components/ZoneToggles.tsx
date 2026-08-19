@@ -14,12 +14,17 @@ export function ZoneToggles({ engine }: { engine: CathedralEngine }) {
   };
 
   return (
-    <div className="toggles">
+    <div className="flex flex-wrap items-center gap-3">
       {ZONE_DEFS.map((z) => (
-        <label key={z.id} className="zrow">
-          <input type="checkbox" checked={visible[z.id]} onChange={() => toggle(z.id)} />
-          <span className="zdot" style={{ background: z.hex }} />
-          <span className="zlabel">{z.label}</span>
+        <label key={z.id} className="flex cursor-pointer items-center gap-1.5">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-xs"
+            checked={visible[z.id]}
+            onChange={() => toggle(z.id)}
+          />
+          <span className="inline-block size-2.5 rounded-full" style={{ background: z.hex }} />
+          <span className="text-xs opacity-80">{z.label}</span>
         </label>
       ))}
     </div>

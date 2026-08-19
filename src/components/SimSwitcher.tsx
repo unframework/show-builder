@@ -9,7 +9,7 @@ const CURRENT = 'cathedral.html';
 export function SimSwitcher() {
   return (
     <select
-      className="sim-switcher"
+      className="select select-sm select-bordered font-bold"
       defaultValue={CURRENT}
       onChange={(e) => {
         window.location.href = e.target.value;

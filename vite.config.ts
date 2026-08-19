@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { extname, join, sep } from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
@@ -38,7 +39,7 @@ function servePixelMap(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), servePixelMap()],
+  plugins: [react(), tailwindcss(), servePixelMap()],
   build: {
     rollupOptions: {
       input: { cathedral: join(import.meta.dirname, 'cathedral.html') },

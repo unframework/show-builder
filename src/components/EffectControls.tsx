@@ -7,10 +7,10 @@ export function EffectControls({ engine }: { engine: CathedralEngine }) {
   const [speed, setSpeed] = useState(1);
 
   return (
-    <>
-      <label className="ctrl-label">EFFECT</label>
+    <div className="flex items-center gap-2">
+      <span className="text-xs opacity-50">EFFECT</span>
       <select
-        className="effect-select"
+        className="select select-sm select-bordered"
         value={effect}
         onChange={(e) => {
           const id = e.target.value as DemoEffectId;
@@ -25,9 +25,9 @@ export function EffectControls({ engine }: { engine: CathedralEngine }) {
         ))}
       </select>
 
-      <label className="ctrl-label">SPEED</label>
+      <span className="text-xs opacity-50">SPEED</span>
       <input
-        className="speed-slider"
+        className="range range-xs range-warning w-60"
         type="range"
         min={0.1}
         max={3}
@@ -39,6 +39,6 @@ export function EffectControls({ engine }: { engine: CathedralEngine }) {
           engine.setDemoSpeed(v);
         }}
       />
-    </>
+    </div>
   );
 }

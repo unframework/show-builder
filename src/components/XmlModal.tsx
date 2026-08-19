@@ -23,16 +23,19 @@ export function XmlModal({ name, fetchXml, onClose }: XmlModalProps) {
   }, [name, fetchXml]);
 
   return (
-    <div className="xml-modal" onClick={onClose}>
-      <div className="xml-modal-box" onClick={(e) => e.stopPropagation()}>
-        <div className="xml-modal-header">
+    <div className="modal modal-open">
+      <div className="modal-box flex h-[80vh] w-[80vw] max-w-[80vw] flex-col p-0">
+        <div className="flex items-center justify-between border-b border-base-300 bg-base-200 px-4 py-2 text-sm">
           <span>{name}</span>
-          <span className="xml-modal-close" onClick={onClose}>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}>
             ✕
-          </span>
+          </button>
         </div>
-        <pre className="xml-modal-content">{content}</pre>
+        <pre className="flex-1 overflow-auto whitespace-pre-wrap break-all p-3 text-xs text-success">
+          {content}
+        </pre>
       </div>
+      <div className="modal-backdrop" onClick={onClose} />
     </div>
   );
 }
