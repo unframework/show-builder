@@ -1,0 +1,145 @@
+import { z } from 'zod';
+
+const vec2 = z.tuple([z.number(), z.number()]);
+const vec3 = z.tuple([z.number(), z.number(), z.number()]);
+
+const cellPolygons = z.object({
+  cells: z.array(z.object({ cell: z.string(), ring: z.array(vec2) })),
+});
+
+const mainArches = z.object({
+  arches: z.array(
+    z.object({
+      universe: z.number(),
+      universe_start_channel: z.number().optional(),
+      x_position_m: z.number(),
+      pixel_polygons: z.array(z.array(vec2).nullable()),
+    }),
+  ),
+});
+
+const miniArches = z.object({
+  arches: z.array(
+    z.object({
+      universe: z.number(),
+      x_position_m: z.number(),
+      pixel_positions: z.array(vec2),
+    }),
+  ),
+});
+
+const quadArches = z.object({
+  faces: z.array(
+    z.object({
+      universe: z.number(),
+      universe_start_channel: z.number(),
+      span_axis: z.enum(['x', 'z']),
+      fixed_axis_pos_m: z.number(),
+      pixel_positions: z.array(vec2),
+    }),
+  ),
+});
+
+const spire = z.object({
+  strands: z.array(
+    z.object({
+      universe: z.number(),
+      universe_start_channel: z.number(),
+      pixel_positions: z.array(vec3),
+    }),
+  ),
+});
+
+const spirelets = z.object({
+  pixels: z.array(
+    z.object({
+      corner: z.string(),
+      position: vec3,
+      universe: z.number(),
+      universe_start_channel: z.number(),
+    }),
+  ),
+});
+
+const canopy = z.object({
+  runs: z.array(
+    z.object({
+      universe: z.number(),
+      universe_start_channel: z.number(),
+      pixel_positions: z.array(vec3),
+    }),
+  ),
+});
+
+export type CellPolygons = z.infer<typeof cellPolygons>;
+export type MainArches = z.infer<typeof mainArches>;
+export type MiniArches = z.infer<typeof miniArches>;
+export type QuadArches = z.infer<typeof quadArches>;
+export type Spire = z.infer<typeof spire>;
+export type Spirelets = z.infer<typeof spirelets>;
+export type Canopy = z.infer<typeof canopy>;
+
+export interface PixelMap {
+  cellPolygons: CellPolygons;
+  mainArches: MainArches;
+  miniLeft: MiniArches;
+  miniRight: MiniArches;
+  quads: QuadArches[];
+  spires: Spire[];
+  spirelets: Spirelets;
+  canopy: Canopy;
+}
+
+const QUAD_NAMES = [
+  'back-bottom-left',
+  'back-bottom-right',
+  'back-top-left',
+  'back-top-right',
+  'front-top-left',
+  'front-top-right',
+];
+
+const SPIRE_NAMES = ['front-left', 'front-right', 'back-left', 'back-right'];
+
+// Local (playa / dev): pixel-map served alongside the app. Otherwise the wiki copy.
+const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const DATA_BASE = isLocalHost ? '/pixel-map' : 'https://wiki.thegothicfolly.com/sim/pixel-map';
+
+async function loadJson<T>(file: string, schema: z.ZodType<T>): Promise<T> {
+  const res = await fetch(`${DATA_BASE}/${file}`);
+  if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
+  return schema.parse(await res.json());
+}
+
+export async function loadPixelMap(): Promise<PixelMap> {
+  const [
+    cellPolygonsData,
+    mainArchesData,
+    miniLeft,
+    miniRight,
+    quads,
+    spires,
+    spireletsData,
+    canopyData,
+  ] = await Promise.all([
+    loadJson('cell-polygons.json', cellPolygons),
+    loadJson('arch-led-positions.json', mainArches),
+    loadJson('arch-led-positions-mini-left.json', miniArches),
+    loadJson('arch-led-positions-mini-right.json', miniArches),
+    Promise.all(QUAD_NAMES.map((n) => loadJson(`arch-led-positions-quad-${n}.json`, quadArches))),
+    Promise.all(SPIRE_NAMES.map((n) => loadJson(`spire-led-positions-${n}.json`, spire))),
+    loadJson('spires-corners-led-positions.json', spirelets),
+    loadJson('canopy-led-positions.json', canopy),
+  ]);
+
+  return {
+    cellPolygons: cellPolygonsData,
+    mainArches: mainArchesData,
+    miniLeft,
+    miniRight,
+    quads,
+    spires,
+    spirelets: spireletsData,
+    canopy: canopyData,
+  };
+}

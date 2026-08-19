@@ -3,6 +3,10 @@
 
 # Node
 relay/node_modules/
+node_modules/
+
+# Vite build output
+dist/
 
 # xLights render output (regenerated from .xsq via headless CLI)
 xlights/*.fseq
