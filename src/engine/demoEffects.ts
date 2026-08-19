@@ -1,4 +1,8 @@
-export type DemoEffectId = 'zone' | 'lr-sweep' | 'rise' | 'fb-sweep' | 'radial' | 'twinkle';
+import { createNoise4D } from 'simplex-noise';
+import type { Vec3 } from './coords';
+
+export type DemoEffectId =
+  'zone' | 'lr-sweep' | 'rise' | 'fb-sweep' | 'radial' | 'twinkle' | 'noise';
 
 export interface EffectInput {
   xn: number;
@@ -6,6 +10,8 @@ export interface EffectInput {
   zn: number;
   phase: number;
   twinkleOffset: number;
+  // Normalized position of the rose window: a focal point some effects warp around.
+  focus: Vec3;
 }
 
 // HSL for a pixel given its normalized position and the animation phase.
@@ -19,6 +25,53 @@ export interface DemoEffect {
 const bell = (p: number) => Math.pow(Math.max(0, Math.cos(p * Math.PI)), 2);
 const wrap = (x: number) => ((x % 1) + 1) % 1;
 const band = (p: number) => 0.03 + 0.52 * bell(p);
+const smoothstep = (e0: number, e1: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+// A 1→0 spike on every beat: instant attack on the kick, exponential decay with
+// time constant `decay` (seconds). `phase` is the animation clock in seconds.
+const spike = (phase: number, bpm: number, decay: number) => {
+  const period = 60 / bpm;
+  const sinceBeat = ((phase % period) + period) % period;
+  return Math.exp(-sinceBeat / decay);
+};
+
+const noise4D = createNoise4D();
+const NOISE_SCALE = 6.5;
+const NOISE_TIME = 0.4;
+const NOISE_THRESHOLD = 0;
+// Half-width of the black↔white ramp around the threshold, in noise units.
+// 0 = hard edge; larger = softer, more gradient between blobs.
+const NOISE_EDGE = 0.07;
+// Radial frequency falloff: the noise runs at full detail at the focus and
+// coarsens outward. Smaller = blobs grow bigger, faster, with distance.
+const NOISE_FOCUS_FALLOFF = 0.15;
+const PULSE_BPM = 120;
+const PULSE_DEPTH = 0.05;
+// Decay time constant of the kick spike, seconds (~fully dropped by ~3×).
+const PULSE_DECAY = 0.07;
+// How far the pattern pops outward from the focus on each kick (fraction of scale).
+const PULSE_EXPAND = 0.1;
+
+// Warp a normalized position around `focus` so noise sampled at the result stays
+// fine-grained near the focus and stretches (coarsens) with distance in every
+// direction. The radial coordinate is compressed logarithmically; direction is
+// preserved. As r → 0 the local frequency approaches NOISE_SCALE unchanged.
+// `zoom` scales the sampled offset about the focus: < 1 pushes features outward.
+function focusWarp(x: number, y: number, z: number, focus: Vec3, zoom: number): Vec3 {
+  const [fx, fy, fz] = focus;
+  const dx = x - fx;
+  const dy = y - fy;
+  const dz = z - fz;
+  const r = Math.hypot(dx, dy, dz);
+  const base =
+    r < 1e-6
+      ? NOISE_SCALE
+      : (NOISE_SCALE * NOISE_FOCUS_FALLOFF * Math.log1p(r / NOISE_FOCUS_FALLOFF)) / r;
+  const gain = base * zoom;
+  return [fx * NOISE_SCALE + dx * gain, fy * NOISE_SCALE + dy * gain, fz * NOISE_SCALE + dz * gain];
+}
 
 export const DEMO_EFFECTS: DemoEffect[] = [
   { id: 'zone', label: 'zone colors' },
@@ -55,6 +108,22 @@ export const DEMO_EFFECTS: DemoEffect[] = [
         0.75 + 0.25 * Math.cos(twinkleOffset * 3),
         0.02 + 0.55 * b,
       ];
+    },
+  },
+  {
+    id: 'noise',
+    label: 'noise blobs',
+    hsl: ({ xn, yn, zn, phase, focus }) => {
+      const kick = spike(phase, PULSE_BPM, PULSE_DECAY);
+      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1 - PULSE_EXPAND * kick);
+      const v = noise4D(sx, sy, sz, phase * NOISE_TIME);
+      const amt = smoothstep(
+        NOISE_THRESHOLD - NOISE_EDGE,
+        NOISE_THRESHOLD + NOISE_EDGE,
+        v - PULSE_DEPTH * kick,
+      );
+      const yoff = (1 - yn) * (1 - yn);
+      return [-0.2 + 0.25 * amt - yoff * 0.2, 1, (0.5 + 0.1 * kick) * amt];
     },
   },
 ];

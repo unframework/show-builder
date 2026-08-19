@@ -2,16 +2,19 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildMainArches, buildMiniArches, buildQuadArches } from './build/arches';
 import { buildCanopy } from './build/canopy';
-import { buildRoseWindow } from './build/roseWindow';
+import { buildRoseWindow, ROSE_CENTER_WORLD } from './build/roseWindow';
 import { buildSpirelets } from './build/spirelets';
 import { buildSpires } from './build/spires';
+import type { Vec3 } from './coords';
 import type { PixelMap } from './pixelData';
 import { SceneBuilder } from './SceneBuilder';
 import {
+  normalizePoint,
   normalizeTargets,
   resetToZoneColors,
   toPixelDescriptors,
   updateLiveColors,
+  type Bounds,
   type LedTarget,
   type PixelDescriptor,
 } from './targets';
@@ -37,6 +40,7 @@ export class CathedralEngine {
   private readonly targets: LedTarget[];
 
   private readonly liveChannels = new Map<number, Uint8Array>();
+  private readonly bounds: Bounds;
 
   private frameHandle = 0;
 
@@ -80,7 +84,7 @@ export class CathedralEngine {
     this.groups = builder.groups;
     this.targets = builder.targets;
     for (const z of ZONE_DEFS) this.scene.add(this.groups[z.id]);
-    normalizeTargets(this.targets);
+    this.bounds = normalizeTargets(this.targets);
 
     this.resize();
     this.frameHandle = requestAnimationFrame(this.animate);
@@ -92,6 +96,10 @@ export class CathedralEngine {
 
   getPixels(): PixelDescriptor[] {
     return toPixelDescriptors(this.targets);
+  }
+
+  getFocus(): Vec3 {
+    return normalizePoint(ROSE_CENTER_WORLD, this.bounds);
   }
 
   applyUniverse(universe: number, channels: ArrayLike<number>): void {

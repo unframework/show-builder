@@ -18,7 +18,7 @@ export function useEffectSource(
 
   useEffect(() => {
     if (!engine) return;
-    const source = new EffectSource(engine.getPixels(), (u, bytes) =>
+    const source = new EffectSource(engine.getPixels(), engine.getFocus(), (u, bytes) =>
       engine.applyUniverse(u, bytes),
     );
     sourceRef.current = source;

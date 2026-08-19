@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Vec3 } from './coords';
 import { DEMO_EFFECT_BY_ID, type DemoEffect, type DemoEffectId } from './demoEffects';
 import type { PixelDescriptor } from './targets';
 
@@ -12,6 +13,7 @@ const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)))
 // relay uses. Runs on its own animation clock while active.
 export class EffectSource {
   private readonly pixels: PixelDescriptor[];
+  private readonly focus: Vec3;
   private readonly emit: Emit;
   private readonly buffers = new Map<number, Uint8Array>();
   private readonly color = new THREE.Color();
@@ -22,8 +24,9 @@ export class EffectSource {
   private lastTs: number | null = null;
   private frameHandle = 0;
 
-  constructor(pixels: PixelDescriptor[], emit: Emit) {
+  constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit) {
     this.pixels = pixels;
+    this.focus = focus;
     this.emit = emit;
 
     const length = new Map<number, number>();
@@ -74,6 +77,7 @@ export class EffectSource {
         zn: p.zn,
         phase: this.phase,
         twinkleOffset: p.twinkleOffset,
+        focus: this.focus,
       });
       this.color.setHSL(h, s, l);
       bytes[p.ch0] = clampByte(this.color.r);

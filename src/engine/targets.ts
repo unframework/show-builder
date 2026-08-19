@@ -66,7 +66,16 @@ function paint(
   }
 }
 
-export function normalizeTargets(targets: LedTarget[]): void {
+export interface Bounds {
+  lo: Vec3;
+  span: Vec3;
+}
+
+export function normalizePoint(world: Vec3, { lo, span }: Bounds): Vec3 {
+  return [(world[0] - lo[0]) / span[0], (world[1] - lo[1]) / span[1], (world[2] - lo[2]) / span[2]];
+}
+
+export function normalizeTargets(targets: LedTarget[]): Bounds {
   const lo: Vec3 = [Infinity, Infinity, Infinity];
   const hi: Vec3 = [-Infinity, -Infinity, -Infinity];
   for (const t of targets) {
@@ -76,12 +85,12 @@ export function normalizeTargets(targets: LedTarget[]): void {
     }
   }
   const span: Vec3 = [hi[0] - lo[0] || 1, hi[1] - lo[1] || 1, hi[2] - lo[2] || 1];
+  const bounds: Bounds = { lo, span };
   for (const t of targets) {
-    t.xn = (t.world[0] - lo[0]) / span[0];
-    t.yn = (t.world[1] - lo[1]) / span[1];
-    t.zn = (t.world[2] - lo[2]) / span[2];
+    [t.xn, t.yn, t.zn] = normalizePoint(t.world, bounds);
     t.twinkleOffset = Math.random() * Math.PI * 2;
   }
+  return bounds;
 }
 
 export function updateLiveColors(

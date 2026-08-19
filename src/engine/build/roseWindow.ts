@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Vec3 } from '../coords';
 import type { CellPolygons } from '../pixelData';
 import type { SceneBuilder } from '../SceneBuilder';
 import { ROSE_CELL_CHANNEL } from '../zones';
@@ -9,6 +10,8 @@ import { ROSE_CELL_CHANNEL } from '../zones';
 const WX = 0.443;
 const WY = 5.936;
 const WZ = -8.567;
+
+export const ROSE_CENTER_WORLD: Vec3 = [WX, WY, WZ];
 
 function rotatePetal(r: number, t: number, angleDeg: number): [number, number] {
   const a = (angleDeg * Math.PI) / 180;
