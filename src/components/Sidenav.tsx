@@ -1,3 +1,4 @@
+import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import type { NowPlaying } from '../relay/protocol';
 
@@ -11,7 +12,7 @@ interface SidenavProps {
 
 export function Sidenav({ sequences, nowPlaying, connected, onSelect, onViewXml }: SidenavProps) {
   return (
-    <div className={`sidenav${connected ? '' : ' disconnected'}`}>
+    <div className={clsx('sidenav', !connected && 'disconnected')}>
       <h3>Sequences</h3>
       <div className="seq-list">
         {sequences.map((name) => {
@@ -19,10 +20,10 @@ export function Sidenav({ sequences, nowPlaying, connected, onSelect, onViewXml 
           return (
             <div
               key={name}
-              className={`seq-row${current ? ' current' : ''}`}
+              className={clsx('seq-row', current && 'current')}
               onClick={() => onSelect(name)}
             >
-              <span className={`seq-status-dot${current ? ` ${nowPlaying.status}` : ''}`} />
+              <span className={clsx('seq-status-dot', current && nowPlaying.status)} />
               <span className="seq-name" title={name}>
                 {name}
               </span>
@@ -60,7 +61,7 @@ function StatusFooter({ connected, nowPlaying }: { connected: boolean; nowPlayin
   }, [rendering, nowPlaying.name]);
 
   let text: string;
-  let cls = '';
+  let cls: string | undefined;
   if (!connected) {
     text = 'relay not connected';
     cls = 'disconnected';
@@ -75,5 +76,5 @@ function StatusFooter({ connected, nowPlaying }: { connected: boolean; nowPlayin
     text = 'idle — select a sequence';
   }
 
-  return <div className={`sidenav-status ${cls}`}>{text}</div>;
+  return <div className={clsx('sidenav-status', cls)}>{text}</div>;
 }
