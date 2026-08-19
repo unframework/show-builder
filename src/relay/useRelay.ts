@@ -43,10 +43,7 @@ export function useRelay(engine: CathedralEngine | null): RelayState {
   const markLive = useCallback(() => {
     setIsLive(true);
     clearTimeout(liveTimer.current);
-    liveTimer.current = window.setTimeout(() => {
-      engineRef.current?.clearLive();
-      setIsLive(false);
-    }, LIVE_TIMEOUT_MS);
+    liveTimer.current = window.setTimeout(() => setIsLive(false), LIVE_TIMEOUT_MS);
   }, []);
 
   const fetchSequences = useCallback(async () => {

@@ -5,15 +5,15 @@ import { buildCanopy } from './build/canopy';
 import { buildRoseWindow } from './build/roseWindow';
 import { buildSpirelets } from './build/spirelets';
 import { buildSpires } from './build/spires';
-import { DEMO_EFFECT_BY_ID, type DemoEffect, type DemoEffectId } from './demoEffects';
 import type { PixelMap } from './pixelData';
 import { SceneBuilder } from './SceneBuilder';
 import {
   normalizeTargets,
   resetToZoneColors,
-  updateDemoColors,
+  toPixelDescriptors,
   updateLiveColors,
   type LedTarget,
+  type PixelDescriptor,
 } from './targets';
 import { ROSE_CELL_CHANNEL, ZONE_DEFS, type ZoneId } from './zones';
 
@@ -37,13 +37,7 @@ export class CathedralEngine {
   private readonly targets: LedTarget[];
 
   private readonly liveChannels = new Map<number, Uint8Array>();
-  private readonly tmpColor = new THREE.Color();
 
-  private effect: DemoEffect = DEMO_EFFECT_BY_ID.get('zone')!;
-  private demoSpeed = 1;
-  private liveActive = false;
-  private phase = 0;
-  private lastTs: number | null = null;
   private frameHandle = 0;
 
   constructor(container: HTMLElement, pixelMap: PixelMap) {
@@ -96,18 +90,12 @@ export class CathedralEngine {
     this.groups[id].visible = visible;
   }
 
-  setDemoEffect(id: DemoEffectId): void {
-    const effect = DEMO_EFFECT_BY_ID.get(id);
-    if (effect) this.effect = effect;
-  }
-
-  setDemoSpeed(speed: number): void {
-    this.demoSpeed = speed;
+  getPixels(): PixelDescriptor[] {
+    return toPixelDescriptors(this.targets);
   }
 
   applyUniverse(universe: number, channels: ArrayLike<number>): void {
     this.liveChannels.set(universe, Uint8Array.from(channels));
-    this.liveActive = true;
   }
 
   applyRoseCells(cells: RoseCellUpdate[]): void {
@@ -125,12 +113,10 @@ export class CathedralEngine {
         chs[ch0 + 2] = b;
       }
     }
-    this.liveActive = true;
   }
 
   clearLive(): void {
     this.liveChannels.clear();
-    this.liveActive = false;
     resetToZoneColors(this.targets);
   }
 
@@ -156,15 +142,10 @@ export class CathedralEngine {
     this.controls.update();
   };
 
-  private animate = (ts: number): void => {
+  private animate = (): void => {
     this.frameHandle = requestAnimationFrame(this.animate);
-    if (!this.liveActive && this.lastTs !== null) {
-      this.phase += ((ts - this.lastTs) / 1000) * this.demoSpeed;
-    }
-    this.lastTs = ts;
     this.controls.update();
-    if (this.liveActive) updateLiveColors(this.targets, this.liveChannels);
-    else updateDemoColors(this.targets, this.effect, this.phase, this.tmpColor);
+    updateLiveColors(this.targets, this.liveChannels);
     this.renderer.render(this.scene, this.camera);
   };
 }

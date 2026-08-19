@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import type { CathedralEngine } from '../engine/CathedralEngine';
 import { DEMO_EFFECTS, type DemoEffectId } from '../engine/demoEffects';
+import type { EffectSourceHandle } from '../useEffectSource';
 
-export function EffectControls({ engine }: { engine: CathedralEngine }) {
+export function EffectControls({ source }: { source: EffectSourceHandle }) {
   const [effect, setEffect] = useState<DemoEffectId>('zone');
   const [speed, setSpeed] = useState(1);
 
@@ -15,7 +15,7 @@ export function EffectControls({ engine }: { engine: CathedralEngine }) {
         onChange={(e) => {
           const id = e.target.value as DemoEffectId;
           setEffect(id);
-          engine.setDemoEffect(id);
+          source.setEffect(id);
         }}
       >
         {DEMO_EFFECTS.map((eff) => (
@@ -36,7 +36,7 @@ export function EffectControls({ engine }: { engine: CathedralEngine }) {
         onChange={(e) => {
           const v = Number(e.target.value);
           setSpeed(v);
-          engine.setDemoSpeed(v);
+          source.setSpeed(v);
         }}
       />
     </div>

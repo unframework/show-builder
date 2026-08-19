@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { Vec3 } from './coords';
-import type { DemoEffect } from './demoEffects';
 
 // A single addressable LED, either a vertex in a Points cloud or a whole mesh's
 // material. `ch0` is its 0-based channel offset within `universe`.
@@ -27,6 +26,30 @@ export interface MeshTarget extends LedTargetBase {
 }
 
 export type LedTarget = PointTarget | MeshTarget;
+
+// A frame source's view of one LED: its DMX address, normalized position, and
+// resting zone color — everything an effect needs, minus the Three.js object.
+export interface PixelDescriptor {
+  universe: number;
+  ch0: number;
+  xn: number;
+  yn: number;
+  zn: number;
+  twinkleOffset: number;
+  base: [number, number, number];
+}
+
+export function toPixelDescriptors(targets: LedTarget[]): PixelDescriptor[] {
+  return targets.map((t) => ({
+    universe: t.universe,
+    ch0: t.ch0,
+    xn: t.xn,
+    yn: t.yn,
+    zn: t.zn,
+    twinkleOffset: t.twinkleOffset,
+    base: [t.base.r, t.base.g, t.base.b],
+  }));
+}
 
 function paint(
   target: LedTarget,
@@ -59,31 +82,6 @@ export function normalizeTargets(targets: LedTarget[]): void {
     t.zn = (t.world[2] - lo[2]) / span[2];
     t.twinkleOffset = Math.random() * Math.PI * 2;
   }
-}
-
-export function updateDemoColors(
-  targets: LedTarget[],
-  effect: DemoEffect,
-  phase: number,
-  tmp: THREE.Color,
-): void {
-  const dirty = new Set<THREE.BufferAttribute>();
-  for (const t of targets) {
-    if (!effect.hsl) {
-      paint(t, t.base.r, t.base.g, t.base.b, dirty);
-      continue;
-    }
-    const [h, s, l] = effect.hsl({
-      xn: t.xn,
-      yn: t.yn,
-      zn: t.zn,
-      phase,
-      twinkleOffset: t.twinkleOffset,
-    });
-    tmp.setHSL(h, s, l);
-    paint(t, tmp.r, tmp.g, tmp.b, dirty);
-  }
-  for (const buf of dirty) buf.needsUpdate = true;
 }
 
 export function updateLiveColors(
