@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from 'vite';
 
 const PIXEL_MAP_DIR = join(import.meta.dirname, 'pixel-map');
 const RUNNER_ORIGIN = 'http://127.0.0.1:3002';
+const runnerOnlyBuild = process.env.RUNNER_BUILD === '1';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.json': 'application/json',
@@ -50,12 +51,19 @@ export default defineConfig({
       '/fx': { target: RUNNER_ORIGIN, ws: true },
     },
   },
-  build: {
-    rollupOptions: {
-      input: {
-        cathedral: join(import.meta.dirname, 'cathedral.html'),
-        runner: join(import.meta.dirname, 'runner.html'),
+  build: runnerOnlyBuild
+    ? {
+        // Deployable runner artifact: just the control UI, no 3D sim.
+        outDir: 'dist-runner/ui',
+        emptyOutDir: true,
+        rollupOptions: { input: { runner: join(import.meta.dirname, 'runner.html') } },
+      }
+    : {
+        rollupOptions: {
+          input: {
+            cathedral: join(import.meta.dirname, 'cathedral.html'),
+            runner: join(import.meta.dirname, 'runner.html'),
+          },
+        },
       },
-    },
-  },
 });
