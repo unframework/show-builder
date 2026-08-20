@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { EffectsPanel } from '../components/EffectsPanel';
+import { EffectControls } from '../components/EffectControls';
 import { createWsControl, type WsControl } from './wsControl';
 
 // Same origin as the page: the runner serves both directly, and the Vite dev
@@ -30,8 +30,8 @@ export function RunnerApp() {
         </span>
       </header>
       {control && (
-        <div className="mt-auto">
-          <EffectsPanel source={control} />
+        <div className="mt-auto border-t border-base-300">
+          <EffectControls source={control} />
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EffectsPanel } from './components/EffectsPanel';
+import { EffectControls } from './components/EffectControls';
 import { Sidenav } from './components/Sidenav';
 import { Toolbar } from './components/Toolbar';
 import { XmlModal } from './components/XmlModal';
@@ -36,17 +36,19 @@ export function App() {
         />
         <div className="canvas-wrap relative flex-1 overflow-hidden" ref={setContainer} />
       </div>
-      {engine && <EffectsPanel source={effectSource} />}
-
-      {!engine && (
-        <div className="fixed inset-0 grid place-items-center text-sm">
+      <div className="shrink-0 flex flex-col px-2 py-3 gap-4 border-t border-base-300 bg-base-200">
+        <div className="flex flex-wrap gap-8 items-center">
+          <h3 className="text-xs uppercase tracking-wide opacity-50 sm:px-4">Effects</h3>
           {error ? (
             <span className="text-error">Error: {error}</span>
           ) : (
-            <span className="loading loading-dots loading-lg text-base-content/50" />
+            !engine && <span className="loading loading-dots loading-lg text-base-content/50" />
           )}
         </div>
-      )}
+        <div className="rounded-lg overflow-hidden">
+          <EffectControls source={effectSource} />
+        </div>
+      </div>
 
       {xmlName && (
         <XmlModal name={xmlName} fetchXml={relay.fetchXml} onClose={() => setXmlName(null)} />
