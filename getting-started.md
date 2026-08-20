@@ -1,11 +1,13 @@
 # Gothic Folly Show Builder — Getting Started
 
 <!-- wiki-exclude-start -->
+
 Welcome! This package is everything you need to build a light show for the
 Gothic Folly — a full-scale LED cathedral at Burning Man 2026. Your sequence
 could run on the real installation on the playa.
 
 ---
+
 <!-- wiki-exclude-end -->
 
 ## What's in this package
@@ -28,6 +30,7 @@ show-builder/
 xLights is free, open-source sequencing software often used to create holiday light displays. The project files are already set up — you just open xLights and start creating.
 
 Never used xLights before? These are the best places to get oriented first:
+
 - [xLights Quick Start Guide](https://xlights.org/quick-start-guide/) — official written walkthrough
 - [xLights Quick Start playlist](https://www.youtube.com/playlist?list=PLccGtinHO7Iy15tWfyQgr1THQbCf_1T9f) — official video series (YouTube)
 - [xLights Beginner Seminar Jan 2021 — Part 2](https://www.youtube.com/watch?v=fuBly6mVFXM) — the xLights deep dive; Part 1 covers the intro hardware/setup context (YouTube)
@@ -60,6 +63,7 @@ Click the **Layout** tab. You'll see all the LED zones placed in 3D space: arche
 Being careful not to move any of the models in the window, click on the groups (represented as folders) to see which names apply to which pixels and shapes.
 
 A couple of things to notice:
+
 - The "spirelets," which are the little spires on many of the upper corners, appear as dots.
 - The main spires appear as a grid. That's just so it's easier to apply various 2-dimensional patterns to the spires that will spin and swirl around them.
 
@@ -89,21 +93,26 @@ This step uses the **Terminal** (Mac) or **Command Prompt** (Windows) — a text
 Download from **[nodejs.org](https://nodejs.org/)** — click the big "LTS" button. Run the installer and follow the prompts.
 
 **Open a terminal:**
+
 - **Mac:** Press **⌘ Space**, type `Terminal`, and hit Enter.
 - **Windows:** Press the **Windows key**, type `cmd`, and hit Enter.
 
 **Navigate to the relay folder:**
 Type the following command, but **don't press Enter yet** — replace the path with the actual location of the `relay` folder on your computer:
+
 ```
 cd /path/to/show-builder/relay
 ```
+
 > **Shortcut:** On a Mac, you can type `cd ` (with a space after it), then drag the `relay` folder from Finder into the terminal window. The path fills in automatically. Then press Enter.
 
 **Install relay dependencies:**
 Type this line:
+
 ```
 npm install
 ```
+
 This downloads the relay's dependencies. It only needs to run once.
 
 ### Every session:
@@ -112,14 +121,18 @@ This downloads the relay's dependencies. It only needs to run once.
 
 **Start the relay:**
 Type this line:
+
 ```
 node relay.js
 ```
+
 You should see something like:
+
 ```
 WebSocket server listening on ws://localhost:3001
 UDP receiver listening on port 5568
 ```
+
 Leave this terminal window open and running during your session.
 
 > **Firewall popup?** If your computer asks whether to allow the relay to accept network connections, click **Allow**.
@@ -139,9 +152,11 @@ To disconnect: click Output to Lights again.
 **No internet? (playa mode)**
 
 By default, the simulator loads its LED layout data from the web. On the playa without a connection, you can serve it locally instead. In a new terminal window, navigate to the `show-builder` folder (same steps as above, but go to `show-builder` instead of `show-builder/relay`) and run:
+
 ```
 python3 -m http.server 8765
 ```
+
 Then open **http://localhost:8765/cathedral-3d-sim.html** in your browser — it will detect the local address and use the bundled data automatically.
 
 ---
@@ -155,9 +170,10 @@ Use **File → New Sequence**. In the wizard, to just get a hang of things, pick
 Drag effects from the row of effects onto the different zones, either by group or individually. Play and see what happens.
 
 A few tips:
+
 - Use the **Cathedral** group to apply an effect to the entire installation at once
 - Use subgroups (**Arches**, **Spires**, **Rose Window**, etc.) to target zones
-- The **Bars* and **Pinwheel** effects are good starting points
+- The **Bars** and **Pinwheel** effects are good starting points
 - Don't forget to turn on your link to the 3D simulator by clicking "Output to Lights" which looks like 💡.
 
 ---
@@ -224,6 +240,7 @@ The starter effect is an animated left-to-right sweep driven by each pixel's
 `z_norm` coordinate. Edit `effect_shader` to replace it with your own effect.
 
 **Spatial coordinate axes** (from `all-pixels-positions.csv`):
+
 - `x_norm` — depth: 0 = playa-facing front, 1 = back
 - `y_norm` — height: 0 = ground, 1 = top of spires
 - `z_norm` — left/right: 0 = left, 1 = right
@@ -243,6 +260,14 @@ it correctly.
 
 ---
 
+## Option C — Effect runner
+
+A headless Node process that runs procedural effects and streams them out as sACN/E1.31, controlled from a minimal web UI. Run `relay/` alongside to preview it in the 3D sim, or point it at the real hardware!
+
+- `npm run runner` — control UI on http://localhost:3002, sACN to `127.0.0.1:5568`.
+- `npm run build:runner` — bundle a dependency-free `dist-runner/` (server + UI + pixel-map); copy the folder to a Raspberry Pi and just run `node start.mjs`.
+
+This effects engine is also available directly in the browser simulator (see the effects bar at the bottom of the screen).
 
 ## Sharing your show
 
