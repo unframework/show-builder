@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
 const PIXEL_MAP_DIR = join(import.meta.dirname, 'pixel-map');
+const RUNNER_ORIGIN = 'http://127.0.0.1:3002';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.json': 'application/json',
@@ -43,10 +44,18 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     allowedHosts: ['.ts.net'],
+    // Route the effect runner's control channel through the dev origin so the
+    // browser never opens a second (mixed-content-prone) connection to :3002.
+    proxy: {
+      '/fx': { target: RUNNER_ORIGIN, ws: true },
+    },
   },
   build: {
     rollupOptions: {
-      input: { cathedral: join(import.meta.dirname, 'cathedral.html') },
+      input: {
+        cathedral: join(import.meta.dirname, 'cathedral.html'),
+        runner: join(import.meta.dirname, 'runner.html'),
+      },
     },
   },
 });
