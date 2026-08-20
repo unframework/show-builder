@@ -4,6 +4,7 @@ import { ROSE_CENTER_WORLD } from '../scene/build/roseWindow';
 import type { Vec3 } from '../scene/coords';
 import type { PixelMap } from '../scene/pixelData';
 import { runBuilders } from '../scene/runBuilders';
+import { createHumanFigures } from './humanFigure';
 import { SceneBuilder } from './SceneBuilder';
 import {
   normalizePoint,
@@ -41,6 +42,7 @@ export class CathedralEngine {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly controls: OrbitControls;
   private readonly groups: Record<ZoneId, THREE.Group>;
+  private readonly figures: THREE.Group;
   private readonly targets: LedTarget[];
 
   private readonly liveChannels = new Map<number, Uint8Array>();
@@ -61,6 +63,9 @@ export class CathedralEngine {
     sun.position.set(-15, 30, -20);
     this.scene.add(sun);
     this.scene.add(new THREE.GridHelper(100, 50, 0x181828, 0x0d0d1a));
+
+    this.figures = createHumanFigures();
+    this.scene.add(this.figures);
 
     const { clientWidth: w, clientHeight: h } = container;
     this.camera = new THREE.PerspectiveCamera(55, w / h || 1, 0.1, 500);
@@ -90,6 +95,10 @@ export class CathedralEngine {
 
   setZoneVisible(id: ZoneId, visible: boolean): void {
     this.groups[id].visible = visible;
+  }
+
+  setFiguresVisible(visible: boolean): void {
+    this.figures.visible = visible;
   }
 
   getPixels(): PixelDescriptor[] {
@@ -152,6 +161,12 @@ export class CathedralEngine {
   private animate = (): void => {
     this.frameHandle = requestAnimationFrame(this.animate);
     this.controls.update();
+    for (const f of this.figures.children) {
+      f.rotation.y = Math.atan2(
+        this.camera.position.x - f.position.x,
+        this.camera.position.z - f.position.z,
+      );
+    }
     updateLiveColors(this.targets, this.liveChannels);
     this.renderer.render(this.scene, this.camera);
   };
