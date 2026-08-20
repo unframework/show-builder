@@ -21,6 +21,8 @@ export function App() {
         <Toolbar
           engine={engine}
           isLive={relay.isLive}
+          connected={relay.connected}
+          flushStats={relay.flushStats}
           onToggleNav={() => setNavOpen((open) => !open)}
         />
       )}
@@ -34,7 +36,11 @@ export function App() {
           onSelect={relay.selectSequence}
           onViewXml={setXmlName}
         />
-        <div className="canvas-wrap relative flex-1 overflow-hidden" ref={setContainer} />
+        <div className="canvas-wrap relative flex-1 overflow-hidden" ref={setContainer}>
+          <span className="pointer-events-none absolute bottom-2 left-1/2 z-10 hidden -translate-x-1/2 text-xs opacity-50 lg:inline">
+            Drag to orbit · Scroll to zoom · Right-drag to pan · Double-click to reset view
+          </span>
+        </div>
       </div>
       <div className="shrink-0 flex flex-col px-2 py-3 gap-4 border-t border-base-300 bg-base-200">
         <div className="flex flex-wrap gap-8 items-center">

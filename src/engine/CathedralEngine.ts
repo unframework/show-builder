@@ -27,6 +27,13 @@ export interface RoseCellUpdate {
 
 const ROSE_PETAL_CHANNELS = 42;
 
+// Orbit pivot: biased toward the front façade (−Z) and near a standing observer's
+// eye level rather than mid-structure, so rotation feels grounded.
+const PIVOT: Vec3 = [0, 4, 0];
+// Lens-shift the framing upward so the pivot sits below screen center, keeping the
+// spires in view without tilting the camera down.
+const VIEW_TOP_BIAS = 0.18;
+
 export class CathedralEngine {
   private readonly container: HTMLElement;
   private readonly renderer: THREE.WebGLRenderer;
@@ -60,7 +67,7 @@ export class CathedralEngine {
     this.camera.position.set(-20, 18, -35);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 8, 2);
+    this.controls.target.set(...PIVOT);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.minDistance = 5;
@@ -123,7 +130,8 @@ export class CathedralEngine {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     this.camera.aspect = w / h || 1;
-    this.camera.updateProjectionMatrix();
+    if (w > 0 && h > 0) this.camera.setViewOffset(w, h, 0, -VIEW_TOP_BIAS * h, w, h);
+    else this.camera.clearViewOffset();
     this.renderer.setSize(w, h);
   };
 
@@ -137,7 +145,7 @@ export class CathedralEngine {
 
   private resetView = (): void => {
     this.camera.position.set(0, 18, -35);
-    this.controls.target.set(0, 8, 0);
+    this.controls.target.set(...PIVOT);
     this.controls.update();
   };
 

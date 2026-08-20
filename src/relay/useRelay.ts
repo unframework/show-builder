@@ -12,6 +12,7 @@ const WS_URL = 'ws://localhost:3001';
 const LIVE_TIMEOUT_MS = 3000;
 const RECONNECT_MS = 3000;
 const POLL_MS = 10000;
+const EXPECTED_FPS = 40;
 
 const IDLE: NowPlaying = { name: null, status: 'idle', message: null };
 
@@ -20,6 +21,7 @@ export interface RelayState {
   nowPlaying: NowPlaying;
   connected: boolean;
   isLive: boolean;
+  flushStats: () => number;
   selectSequence: (name: string) => void;
   fetchXml: (name: string) => Promise<string>;
 }
@@ -40,10 +42,34 @@ export function useRelay(engine: CathedralEngine | null): RelayState {
   nowPlayingRef.current = nowPlaying;
   const liveTimer = useRef(0);
 
+  const frameCounts = useRef(new Map<string, number>());
+  const lastFlush = useRef(performance.now());
+
   const markLive = useCallback(() => {
     setIsLive(true);
     clearTimeout(liveTimer.current);
     liveTimer.current = window.setTimeout(() => setIsLive(false), LIVE_TIMEOUT_MS);
+  }, []);
+
+  // Frame-delivery quality since the previous call, as a 0..1 fraction of the
+  // expected 40fps (averaged across the streams active in the window). Frames
+  // arrive one message per universe/cell-source per frame, so we normalize by
+  // stream count. Returns 0 when no frame arrived at all. Resets the accumulator.
+  const flushStats = useCallback((): number => {
+    const now = performance.now();
+    const elapsedSec = (now - lastFlush.current) / 1000;
+    lastFlush.current = now;
+
+    const counts = frameCounts.current;
+    let total = 0;
+    for (const count of counts.values()) total += count;
+    const active = counts.size;
+    counts.clear();
+
+    if (total === 0) return 0;
+    const avg = total / active;
+    const expected = EXPECTED_FPS * elapsedSec;
+    return Math.min(1, avg / expected);
   }, []);
 
   const fetchSequences = useCallback(async () => {
@@ -80,8 +106,15 @@ export function useRelay(engine: CathedralEngine | null): RelayState {
           return;
         }
         const eng = engineRef.current;
-        if (msg.type === 'universe') eng?.applyUniverse(msg.universe, msg.channels);
-        else eng?.applyRoseCells(msg.data);
+        let stream: string;
+        if (msg.type === 'universe') {
+          eng?.applyUniverse(msg.universe, msg.channels);
+          stream = `u${msg.universe}`;
+        } else {
+          eng?.applyRoseCells(msg.data);
+          stream = `cells:${msg.source ?? ''}`;
+        }
+        frameCounts.current.set(stream, (frameCounts.current.get(stream) ?? 0) + 1);
         markLive();
       };
     };
@@ -134,5 +167,5 @@ export function useRelay(engine: CathedralEngine | null): RelayState {
     return res.text();
   }, []);
 
-  return { sequences, nowPlaying, connected, isLive, selectSequence, fetchXml };
+  return { sequences, nowPlaying, connected, isLive, flushStats, selectSequence, fetchXml };
 }

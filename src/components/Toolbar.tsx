@@ -1,4 +1,5 @@
 import type { CathedralEngine } from '../engine/CathedralEngine';
+import { ConnectionQualityChart } from './ConnectionQualityChart';
 import { SimSwitcher } from './SimSwitcher';
 import { ZoneToggles } from './ZoneToggles';
 
@@ -9,10 +10,14 @@ function Divider() {
 export function Toolbar({
   engine,
   isLive,
+  connected,
+  flushStats,
   onToggleNav,
 }: {
   engine: CathedralEngine;
   isLive: boolean;
+  connected: boolean;
+  flushStats: () => number;
   onToggleNav: () => void;
 }) {
   return (
@@ -27,14 +32,13 @@ export function Toolbar({
       <SimSwitcher />
       <Divider />
       <ZoneToggles engine={engine} />
+      <Divider />
       {isLive && (
         <span className="badge badge-success gap-1" title="Receiving live data from relay">
           ● LIVE
         </span>
       )}
-      <span className="ml-auto hidden text-xs opacity-50 lg:inline">
-        Drag to orbit · Scroll to zoom · Right-drag to pan · Double-click to reset view
-      </span>
+      {connected && <ConnectionQualityChart flushStats={flushStats} />}
     </div>
   );
 }
