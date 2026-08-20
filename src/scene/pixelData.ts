@@ -101,17 +101,11 @@ const QUAD_NAMES = [
 
 const SPIRE_NAMES = ['front-left', 'front-right', 'back-left', 'back-right'];
 
-// Local (playa / dev): pixel-map served alongside the app. Otherwise the wiki copy.
-const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-const DATA_BASE = isLocalHost ? '/pixel-map' : 'https://wiki.thegothicfolly.com/sim/pixel-map';
+// Fetches and validates one pixel-map file. The browser reads over HTTP, a Node
+// runner off disk — the assembly below is agnostic to which.
+export type JsonLoader = <T>(file: string, schema: z.ZodType<T>) => Promise<T>;
 
-async function loadJson<T>(file: string, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${DATA_BASE}/${file}`);
-  if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
-  return schema.parse(await res.json());
-}
-
-export async function loadPixelMap(): Promise<PixelMap> {
+export async function assemblePixelMap(load: JsonLoader): Promise<PixelMap> {
   const [
     cellPolygonsData,
     mainArchesData,
@@ -122,14 +116,14 @@ export async function loadPixelMap(): Promise<PixelMap> {
     spireletsData,
     canopyData,
   ] = await Promise.all([
-    loadJson('cell-polygons.json', cellPolygons),
-    loadJson('arch-led-positions.json', mainArches),
-    loadJson('arch-led-positions-mini-left.json', miniArches),
-    loadJson('arch-led-positions-mini-right.json', miniArches),
-    Promise.all(QUAD_NAMES.map((n) => loadJson(`arch-led-positions-quad-${n}.json`, quadArches))),
-    Promise.all(SPIRE_NAMES.map((n) => loadJson(`spire-led-positions-${n}.json`, spire))),
-    loadJson('spires-corners-led-positions.json', spirelets),
-    loadJson('canopy-led-positions.json', canopy),
+    load('cell-polygons.json', cellPolygons),
+    load('arch-led-positions.json', mainArches),
+    load('arch-led-positions-mini-left.json', miniArches),
+    load('arch-led-positions-mini-right.json', miniArches),
+    Promise.all(QUAD_NAMES.map((n) => load(`arch-led-positions-quad-${n}.json`, quadArches))),
+    Promise.all(SPIRE_NAMES.map((n) => load(`spire-led-positions-${n}.json`, spire))),
+    load('spires-corners-led-positions.json', spirelets),
+    load('canopy-led-positions.json', canopy),
   ]);
 
   return {
@@ -142,4 +136,15 @@ export async function loadPixelMap(): Promise<PixelMap> {
     spirelets: spireletsData,
     canopy: canopyData,
   };
+}
+
+// Local (playa / dev): pixel-map served alongside the app. Otherwise the wiki copy.
+export function loadPixelMap(): Promise<PixelMap> {
+  const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const base = isLocalHost ? '/pixel-map' : 'https://wiki.thegothicfolly.com/sim/pixel-map';
+  return assemblePixelMap(async (file, schema) => {
+    const res = await fetch(`${base}/${file}`);
+    if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
+    return schema.parse(await res.json());
+  });
 }

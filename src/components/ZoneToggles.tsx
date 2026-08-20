@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CathedralEngine } from '../engine/CathedralEngine';
-import { ZONE_DEFS, type ZoneId } from '../engine/zones';
+import { ZONE_DEFS, type ZoneId } from '../scene/zones';
 
 export function ZoneToggles({ engine }: { engine: CathedralEngine }) {
   const [visible, setVisible] = useState<Record<ZoneId, boolean>>(

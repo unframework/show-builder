@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CathedralEngine } from './engine/CathedralEngine';
-import { loadPixelMap } from './engine/pixelData';
+import { loadPixelMap } from './scene/pixelData';
 
 export function useEngine(container: HTMLElement | null): {
   engine: CathedralEngine | null;

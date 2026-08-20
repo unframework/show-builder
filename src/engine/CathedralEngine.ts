@@ -1,12 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { buildMainArches, buildMiniArches, buildQuadArches } from './build/arches';
-import { buildCanopy } from './build/canopy';
-import { buildRoseWindow, ROSE_CENTER_WORLD } from './build/roseWindow';
-import { buildSpirelets } from './build/spirelets';
-import { buildSpires } from './build/spires';
-import type { Vec3 } from './coords';
-import type { PixelMap } from './pixelData';
+import { ROSE_CENTER_WORLD } from '../scene/build/roseWindow';
+import type { Vec3 } from '../scene/coords';
+import type { PixelMap } from '../scene/pixelData';
+import { runBuilders } from '../scene/runBuilders';
 import { SceneBuilder } from './SceneBuilder';
 import {
   normalizePoint,
@@ -18,7 +15,7 @@ import {
   type LedTarget,
   type PixelDescriptor,
 } from './targets';
-import { ROSE_CELL_CHANNEL, ZONE_DEFS, type ZoneId } from './zones';
+import { ROSE_CELL_CHANNEL, ZONE_DEFS, type ZoneId } from '../scene/zones';
 
 export interface RoseCellUpdate {
   petal: number;
@@ -73,13 +70,7 @@ export class CathedralEngine {
     this.renderer.domElement.addEventListener('dblclick', this.resetView);
 
     const builder = new SceneBuilder();
-    buildRoseWindow(builder, pixelMap.cellPolygons);
-    buildMainArches(builder, pixelMap.mainArches);
-    buildMiniArches(builder, pixelMap.miniLeft, pixelMap.miniRight);
-    buildQuadArches(builder, pixelMap.quads);
-    buildSpires(builder, pixelMap.spires);
-    buildSpirelets(builder, pixelMap.spirelets);
-    buildCanopy(builder, pixelMap.canopy);
+    runBuilders(builder, pixelMap);
 
     this.groups = builder.groups;
     this.targets = builder.targets;

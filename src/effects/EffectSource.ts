@@ -1,5 +1,5 @@
-import type { Vec3 } from '../engine/coords';
-import type { PixelDescriptor } from '../engine/targets';
+import type { Vec3 } from '../scene/coords';
+import type { PixelDescriptor } from '../scene/normalize';
 import { hslToRgb } from './color';
 import { DEMO_EFFECT_BY_ID, type DemoEffect, type DemoEffectId } from './demoEffects';
 

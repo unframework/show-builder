@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import type { Vec3 } from './coords';
+import type { Vec3 } from '../scene/coords';
+import { computeBounds, normalizePoint, type Bounds, type PixelDescriptor } from '../scene/normalize';
+
+export { normalizePoint, computeBounds } from '../scene/normalize';
+export type { Bounds, PixelDescriptor } from '../scene/normalize';
 
 // A single addressable LED, either a vertex in a Points cloud or a whole mesh's
 // material. `ch0` is its 0-based channel offset within `universe`.
@@ -26,18 +30,6 @@ export interface MeshTarget extends LedTargetBase {
 }
 
 export type LedTarget = PointTarget | MeshTarget;
-
-// A frame source's view of one LED: its DMX address, normalized position, and
-// resting zone color — everything an effect needs, minus the Three.js object.
-export interface PixelDescriptor {
-  universe: number;
-  ch0: number;
-  xn: number;
-  yn: number;
-  zn: number;
-  twinkleOffset: number;
-  base: [number, number, number];
-}
 
 export function toPixelDescriptors(targets: LedTarget[]): PixelDescriptor[] {
   return targets.map((t) => ({
@@ -66,26 +58,8 @@ function paint(
   }
 }
 
-export interface Bounds {
-  lo: Vec3;
-  span: Vec3;
-}
-
-export function normalizePoint(world: Vec3, { lo, span }: Bounds): Vec3 {
-  return [(world[0] - lo[0]) / span[0], (world[1] - lo[1]) / span[1], (world[2] - lo[2]) / span[2]];
-}
-
 export function normalizeTargets(targets: LedTarget[]): Bounds {
-  const lo: Vec3 = [Infinity, Infinity, Infinity];
-  const hi: Vec3 = [-Infinity, -Infinity, -Infinity];
-  for (const t of targets) {
-    for (let a = 0; a < 3; a++) {
-      lo[a] = Math.min(lo[a], t.world[a]);
-      hi[a] = Math.max(hi[a], t.world[a]);
-    }
-  }
-  const span: Vec3 = [hi[0] - lo[0] || 1, hi[1] - lo[1] || 1, hi[2] - lo[2] || 1];
-  const bounds: Bounds = { lo, span };
+  const bounds = computeBounds(targets.map((t) => t.world));
   for (const t of targets) {
     [t.xn, t.yn, t.zn] = normalizePoint(t.world, bounds);
     t.twinkleOffset = Math.random() * Math.PI * 2;

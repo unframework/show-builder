@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { CHANNELS_PER_UNIVERSE, type Vec3 } from './coords';
+import type { Vec3 } from '../scene/coords';
+import type { Led, LedScene, PointStyle } from '../scene/ledScene';
 import type { LedTarget } from './targets';
-import { ZONE_DEFS, type ZoneId } from './zones';
+import { SPIRELET_HEIGHT, SPIRELET_RADIUS } from '../scene/build/spirelets';
+import { ZONE_DEFS, type ZoneId } from '../scene/zones';
 
 function circleTexture(): THREE.Texture {
   const canvas = document.createElement('canvas');
@@ -14,11 +16,14 @@ function circleTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas);
 }
 
-export class SceneBuilder {
+// The Three.js backend for the geometry builders: turns emitted LEDs into render
+// objects grouped by zone, and records a paintable LedTarget per pixel.
+export class SceneBuilder implements LedScene {
   readonly groups: Record<ZoneId, THREE.Group>;
   readonly targets: LedTarget[] = [];
   private readonly colors: Record<ZoneId, THREE.Color>;
   private readonly circle = circleTexture();
+  private readonly coneGeo = new THREE.ConeGeometry(SPIRELET_RADIUS, SPIRELET_HEIGHT, 3, 1);
 
   constructor() {
     this.groups = {} as Record<ZoneId, THREE.Group>;
@@ -29,55 +34,45 @@ export class SceneBuilder {
     }
   }
 
-  zoneColor(id: ZoneId): THREE.Color {
-    return this.colors[id];
-  }
+  mesh(zone: ZoneId, outline: [number, number][], origin: Vec3, led: Led): void {
+    const color = this.colors[zone];
+    const shape = new THREE.Shape();
+    outline.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)));
 
-  add(id: ZoneId, obj: THREE.Object3D): void {
-    this.groups[id].add(obj);
-  }
-
-  meshTarget(
-    material: THREE.MeshBasicMaterial,
-    universe: number,
-    ch0: number,
-    base: THREE.Color,
-    world: Vec3,
-  ): void {
-    this.targets.push({
-      kind: 'mesh',
-      material,
-      universe,
-      ch0,
-      base,
-      world,
-      xn: 0,
-      yn: 0,
-      zn: 0,
-      twinkleOffset: 0,
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8,
     });
+    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
+    mesh.position.set(origin[0], origin[1], origin[2]);
+    this.groups[zone].add(mesh);
+    this.pushMesh(mat, color, led);
+  }
+
+  cone(zone: ZoneId, led: Led): void {
+    const color = this.colors[zone];
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+    const cone = new THREE.Mesh(this.coneGeo, mat);
+    cone.position.set(led.world[0], led.world[1], led.world[2]);
+    this.groups[zone].add(cone);
+    this.pushMesh(mat, color, led);
   }
 
   // A Points cloud with per-vertex colors tracked for live/demo updates.
-  // Pixel i occupies channels [startCh1-1 + 3i ..], rolling into universe+1 every
-  // 170 pixels (510 channels), matching xLights / F48V5 packing.
-  trackedPoints(
-    positions: Vec3[],
-    universe: number,
-    startCh1: number,
-    color: THREE.Color,
-    circular = false,
-    size = 0.35,
-  ): THREE.Object3D {
-    const n = positions.length;
-    if (n === 0) return new THREE.Group();
+  points(zone: ZoneId, leds: Led[], style: PointStyle): void {
+    const n = leds.length;
+    if (n === 0) return;
+    const color = this.colors[zone];
 
     const posArr = new Float32Array(n * 3);
     const colArr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      posArr[i * 3] = positions[i][0];
-      posArr[i * 3 + 1] = positions[i][1];
-      posArr[i * 3 + 2] = positions[i][2];
+      const w = leds[i].world;
+      posArr[i * 3] = w[0];
+      posArr[i * 3 + 1] = w[1];
+      posArr[i * 3 + 2] = w[2];
       colArr[i * 3] = color.r;
       colArr[i * 3 + 1] = color.g;
       colArr[i * 3 + 2] = color.b;
@@ -89,17 +84,16 @@ export class SceneBuilder {
     colors.usage = THREE.DynamicDrawUsage;
     geo.setAttribute('color', colors);
 
-    const ch0base = startCh1 - 1;
     for (let i = 0; i < n; i++) {
-      const absOff = ch0base + i * 3;
+      const led = leds[i];
       this.targets.push({
         kind: 'point',
         colors,
         index: i,
-        universe: universe + Math.floor(absOff / CHANNELS_PER_UNIVERSE),
-        ch0: absOff % CHANNELS_PER_UNIVERSE,
+        universe: led.universe,
+        ch0: led.ch0,
         base: color,
-        world: positions[i],
+        world: led.world,
         xn: 0,
         yn: 0,
         zn: 0,
@@ -107,29 +101,41 @@ export class SceneBuilder {
       });
     }
 
-    return new THREE.Points(
-      geo,
-      new THREE.PointsMaterial({
-        size,
-        sizeAttenuation: true,
-        vertexColors: true,
-        ...(circular ? { map: this.circle, alphaTest: 0.5 } : {}),
-      }),
+    this.groups[zone].add(
+      new THREE.Points(
+        geo,
+        new THREE.PointsMaterial({
+          size: style.size,
+          sizeAttenuation: true,
+          vertexColors: true,
+          ...(style.circular ? { map: this.circle, alphaTest: 0.5 } : {}),
+        }),
+      ),
     );
   }
 
-  // Arch pixel_positions are [spanCoord, catY]; span/fixed map to Three.js X/Z.
-  archPoints(
-    pixelPositions: [number, number][],
-    spanAxis: 'x' | 'z',
-    fixedValue: number,
-    universe: number,
-    startCh1: number,
-    color: THREE.Color,
-  ): THREE.Object3D {
-    const positions: Vec3[] = pixelPositions.map(([a, b]) =>
-      spanAxis === 'z' ? [-a, b, fixedValue] : [-fixedValue, b, a],
+  line(zone: ZoneId, path: Vec3[]): void {
+    const pts = path.map(([x, y, z]) => new THREE.Vector3(x, y, z));
+    this.groups[zone].add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: this.colors[zone], transparent: true, opacity: 0.35 }),
+      ),
     );
-    return this.trackedPoints(positions, universe, startCh1, color, false, 0.25);
+  }
+
+  private pushMesh(material: THREE.MeshBasicMaterial, base: THREE.Color, led: Led): void {
+    this.targets.push({
+      kind: 'mesh',
+      material,
+      universe: led.universe,
+      ch0: led.ch0,
+      base,
+      world: led.world,
+      xn: 0,
+      yn: 0,
+      zn: 0,
+      twinkleOffset: 0,
+    });
   }
 }
