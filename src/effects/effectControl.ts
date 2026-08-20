@@ -6,4 +6,7 @@ import type { DemoEffectId } from './demoEffects';
 export interface EffectControl {
   setEffect(id: DemoEffectId): Promise<void>;
   setSpeed(speed: number): Promise<void>;
+  setBpm(bpm: number): Promise<void>;
+  // Anchor the beat clock to the downbeat
+  cueBeat(): Promise<void>;
 }

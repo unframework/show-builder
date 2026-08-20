@@ -38,5 +38,11 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
     setSpeed: async (speed) => {
       sourceRef.current?.setSpeed(speed);
     },
+    setBpm: async (bpm) => {
+      sourceRef.current?.setBpm(bpm);
+    },
+    cueBeat: async () => {
+      sourceRef.current?.cueBeat();
+    },
   };
 }

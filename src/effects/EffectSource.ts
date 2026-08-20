@@ -20,6 +20,8 @@ export class EffectSource {
   private effect: DemoEffect = DEMO_EFFECT_BY_ID.get('zone')!;
   private speed = 1;
   private phase = 0;
+  private bpm = 120;
+  private beat = 0;
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit) {
     this.pixels = pixels;
@@ -43,8 +45,17 @@ export class EffectSource {
     this.speed = speed;
   }
 
+  setBpm(bpm: number): void {
+    if (Number.isFinite(bpm) && bpm > 0) this.bpm = bpm;
+  }
+
+  cueBeat(): void {
+    this.beat = 0;
+  }
+
   renderFrame(dt: number): void {
     this.phase += dt * this.speed;
+    this.beat += (dt * this.bpm) / 60;
 
     const { hsl } = this.effect;
     for (const p of this.pixels) {
@@ -60,6 +71,8 @@ export class EffectSource {
         yn: p.yn,
         zn: p.zn,
         phase: this.phase,
+        beat: this.beat,
+        bpm: this.bpm,
         twinkleOffset: p.twinkleOffset,
         focus: this.focus,
       });

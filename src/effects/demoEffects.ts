@@ -9,6 +9,9 @@ export interface EffectInput {
   yn: number;
   zn: number;
   phase: number;
+  // Fractional beats since the last cue; integer crossings are downbeats.
+  beat: number;
+  bpm: number;
   twinkleOffset: number;
   // Normalized position of the rose window: a focal point some effects warp around.
   focus: Vec3;
@@ -30,11 +33,10 @@ const smoothstep = (e0: number, e1: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 // A 1→0 spike on every beat: instant attack on the kick, exponential decay with
-// time constant `decay` (seconds). `phase` is the animation clock in seconds.
-const spike = (phase: number, bpm: number, decay: number) => {
-  const period = 60 / bpm;
-  const sinceBeat = ((phase % period) + period) % period;
-  return Math.exp(-sinceBeat / decay);
+// time constant `decay` (seconds). `beat` is the beat clock in fractional beats.
+const beatSpike = (beat: number, bpm: number, decay: number) => {
+  const sinceBeatSec = (beat - Math.floor(beat)) * (60 / bpm);
+  return Math.exp(-sinceBeatSec / decay);
 };
 
 const noise4D = createNoise4D();
@@ -47,7 +49,6 @@ const NOISE_EDGE = 0.07;
 // Radial frequency falloff: the noise runs at full detail at the focus and
 // coarsens outward. Smaller = blobs grow bigger, faster, with distance.
 const NOISE_FOCUS_FALLOFF = 0.15;
-const PULSE_BPM = 120;
 const PULSE_DEPTH = 0.05;
 // Decay time constant of the kick spike, seconds (~fully dropped by ~3×).
 const PULSE_DECAY = 0.07;
@@ -113,8 +114,8 @@ export const DEMO_EFFECTS: DemoEffect[] = [
   {
     id: 'noise',
     label: 'noise blobs',
-    hsl: ({ xn, yn, zn, phase, focus }) => {
-      const kick = spike(phase, PULSE_BPM, PULSE_DECAY);
+    hsl: ({ xn, yn, zn, phase, beat, bpm, focus }) => {
+      const kick = beatSpike(beat, bpm, PULSE_DECAY);
       const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1 - PULSE_EXPAND * kick);
       const v = noise4D(sx, sy, sz, phase * NOISE_TIME);
       const amt = smoothstep(
