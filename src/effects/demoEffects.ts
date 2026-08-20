@@ -2,7 +2,7 @@ import { createNoise4D } from 'simplex-noise';
 import type { Vec3 } from '../engine/coords';
 
 export type DemoEffectId =
-  'zone' | 'lr-sweep' | 'rise' | 'fb-sweep' | 'radial' | 'twinkle' | 'noise';
+  'zone' | 'lr-sweep' | 'rise' | 'fb-sweep' | 'radial' | 'twinkle' | 'noise' | 'noise-rays';
 
 export interface EffectInput {
   xn: number;
@@ -49,11 +49,19 @@ const NOISE_EDGE = 0.07;
 // Radial frequency falloff: the noise runs at full detail at the focus and
 // coarsens outward. Smaller = blobs grow bigger, faster, with distance.
 const NOISE_FOCUS_FALLOFF = 0.15;
+const NOISE_RISE = -2;
 const PULSE_DEPTH = 0.05;
 // Decay time constant of the kick spike, seconds (~fully dropped by ~3×).
 const PULSE_DECAY = 0.07;
 // How far the pattern pops outward from the focus on each kick (fraction of scale).
 const PULSE_EXPAND = 0.1;
+// Feature count across the unit sphere the rays pierce. Smaller = fewer, broader shafts.
+const RAY_NOISE_SCALE = 3;
+const RAY_NOISE_DEPTH = 0.08; // zero means purely ignoring cathedral depth
+const RAY_EXPAND = 0.2;
+// Horizontal detail multiplier at the floor, ramping to full (1) at the top:
+// compresses the sampled X-coord low down so the bottom reads coarser than the crown.
+const RAY_DETAIL_FLOOR = 0.05;
 
 // Warp a normalized position around `focus` so noise sampled at the result stays
 // fine-grained near the focus and stretches (coarsens) with distance in every
@@ -125,6 +133,37 @@ export const DEMO_EFFECTS: DemoEffect[] = [
       );
       const yoff = (1 - yn) * (1 - yn);
       return [-0.2 + 0.25 * amt - yoff * 0.2, 1, (0.5 + 0.1 * kick) * amt];
+    },
+  },
+  {
+    id: 'noise-rays',
+    label: 'noise rays',
+    hsl: ({ xn, yn, zn, phase, beat, bpm, focus }) => {
+      const [fx, fy, fz] = focus;
+      const dx = Math.abs(xn - fx);
+      const dy = yn - fy;
+      const dz = (zn - fz) * RAY_NOISE_DEPTH;
+      const r = Math.hypot(dx, dy, dz) || 1;
+      const kick = beatSpike(beat, bpm, PULSE_DECAY);
+      const zoom = (1 - RAY_EXPAND * kick) * RAY_NOISE_SCALE;
+      const detail = RAY_DETAIL_FLOOR + (1 - RAY_DETAIL_FLOOR) * 0.5 * (1 + dy / r);
+      const v = noise4D(
+        (dx / r) * zoom * detail,
+        (dy / r) * zoom - phase * NOISE_RISE,
+        (dz / r) * zoom,
+        phase * NOISE_TIME,
+      );
+      const amt = smoothstep(
+        NOISE_THRESHOLD - NOISE_EDGE,
+        NOISE_THRESHOLD + NOISE_EDGE,
+        v - PULSE_DEPTH * kick,
+      );
+      const yoff = (1 - yn) * (1 - yn);
+      return [
+        Math.sin(phase * 0.5) * 0.2 + -0.2 + 0.25 * amt - yoff * 0.2,
+        1,
+        (0.5 + 0.3 * kick) * amt,
+      ];
     },
   },
 ];
