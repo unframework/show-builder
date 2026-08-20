@@ -1,9 +1,11 @@
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import { hslToRgb } from './color';
+import type { ControlState, EffectEvent } from './controlMessages';
 import { DEMO_EFFECT_BY_ID, type DemoEffect, type DemoEffectId } from './demoEffects';
 
 type Emit = (universe: number, bytes: Uint8Array) => void;
+type Listener = (event: EffectEvent) => void;
 
 const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
 
@@ -19,8 +21,10 @@ export class EffectSource {
   private readonly focus: Vec3;
   private readonly emit: Emit;
   private readonly buffers = new Map<number, Uint8Array>();
+  private readonly listeners = new Set<Listener>();
 
   private effect: DemoEffect = DEMO_EFFECT_BY_ID.get('zone')!;
+  private effectId: DemoEffectId = 'zone';
   private speed = 1;
   private phase = 0;
   private bpm = 120;
@@ -40,17 +44,40 @@ export class EffectSource {
     for (const [universe, len] of length) this.buffers.set(universe, new Uint8Array(len));
   }
 
+  subscribe(listener: Listener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  getState(): ControlState {
+    return { type: 'state', effect: this.effectId, speed: this.speed, bpm: this.bpm };
+  }
+
+  private notify(event: EffectEvent): void {
+    for (const listener of this.listeners) listener(event);
+  }
+
   setEffect(id: DemoEffectId): void {
     const effect = DEMO_EFFECT_BY_ID.get(id);
-    if (effect) this.effect = effect;
+    if (!effect || id === this.effectId) return;
+
+    this.effect = effect;
+    this.effectId = id;
+    this.notify(this.getState());
   }
 
   setSpeed(speed: number): void {
+    if (speed === this.speed) return;
+
     this.speed = speed;
+    this.notify(this.getState());
   }
 
   setBpm(bpm: number): void {
-    if (Number.isFinite(bpm) && bpm > 0) this.bpm = bpm;
+    if (!Number.isFinite(bpm) || bpm <= 0 || bpm === this.bpm) return;
+
+    this.bpm = bpm;
+    this.notify(this.getState());
   }
 
   cueBeat(): void {
@@ -71,7 +98,11 @@ export class EffectSource {
     const advance = (dt * this.bpm) / 60;
     const ease = this.beatNudge * Math.min(1, advance);
     this.beatNudge -= ease;
+    const prevBeat = Math.floor(this.beat);
     this.beat += advance + ease;
+    const beat = Math.floor(this.beat);
+
+    if (beat > prevBeat) this.notify({ type: 'beat', beat });
 
     const { hsl } = this.effect;
     for (const p of this.pixels) {

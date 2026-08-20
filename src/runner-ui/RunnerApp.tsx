@@ -14,7 +14,6 @@ export function RunnerApp() {
 
   useEffect(() => {
     const c = createWsControl(CONTROL_WS, {
-      onState: () => {},
       onConnected: setConnected,
     });
     setControl(c);

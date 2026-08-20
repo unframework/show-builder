@@ -22,6 +22,16 @@ body {
   animation: tap-pulse 0.5s ease-out forwards;
 }
 
+@keyframes beat-flash {
+  from {
+    opacity: 1;
+    color: var(--color-warning);
+  }
+}
+.beat-flash {
+  animation: beat-flash 0.2s ease-out;
+}
+
 /* The engine injects its <canvas> into the wrap div at runtime, so size it here. */
 .canvas-wrap > canvas {
   display: block;

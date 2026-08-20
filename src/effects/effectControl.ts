@@ -1,3 +1,4 @@
+import type { EffectEvent } from './controlMessages';
 import type { DemoEffectId } from './demoEffects';
 
 // Transport-agnostic control surface for the effect generator. In-tab an adapter
@@ -9,4 +10,6 @@ export interface EffectControl {
   setBpm(bpm: number): Promise<void>;
   // Anchor the beat clock to the downbeat
   cueBeat(): Promise<void>;
+  // Observe engine events (state, beats). Returns an unsubscribe.
+  subscribe?(listener: (event: EffectEvent) => void): () => void;
 }

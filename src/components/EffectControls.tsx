@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { DEMO_EFFECTS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
@@ -10,6 +10,7 @@ export function EffectControls({ source }: { source: EffectControl }) {
   const [speed, setSpeed] = useState(1);
   const [bpm, setBpm] = useState(120);
   const [pulse, setPulse] = useState(0);
+  const [beatFlash, setBeatFlash] = useState(0);
 
   const applyBpm = useCallback(
     (v: number) => {
@@ -34,6 +35,20 @@ export function EffectControls({ source }: { source: EffectControl }) {
       max={300}
       step={0.1}
     />,
+  );
+
+  useEffect(
+    () =>
+      source.subscribe?.((event) => {
+        if (event.type === 'beat') {
+          setBeatFlash((n) => n + 1);
+          return;
+        }
+        setEffect(event.effect);
+        setSpeed(event.speed);
+        setBpm(event.bpm);
+      }),
+    [source],
   );
 
   return (
@@ -81,7 +96,9 @@ export function EffectControls({ source }: { source: EffectControl }) {
             </div>
 
             <div className="inline-flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="text-base opacity-50">TEMPO</span>
+              <span key={beatFlash} className="beat-flash text-base opacity-50">
+                TEMPO
+              </span>
               <button
                 className={clsx(
                   'btn btn-lg relative overflow-visible',

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { EffectEvent } from './effects/controlMessages';
 import type { CathedralEngine } from './engine/CathedralEngine';
 import { EffectSource } from './effects/EffectSource';
 import type { EffectControl } from './effects/effectControl';
@@ -7,13 +8,19 @@ import type { EffectControl } from './effects/effectControl';
 // is idle. Live frames win: the rAF loop runs only while `isLive` is false.
 export function useEffectSource(engine: CathedralEngine | null, isLive: boolean): EffectControl {
   const sourceRef = useRef<EffectSource | null>(null);
+  const listenersRef = useRef(new Set<(event: EffectEvent) => void>());
 
   useEffect(() => {
     if (!engine) return;
-    sourceRef.current = new EffectSource(engine.getPixels(), engine.getFocus(), (u, bytes) =>
+    const source = new EffectSource(engine.getPixels(), engine.getFocus(), (u, bytes) =>
       engine.applyUniverse(u, bytes),
     );
+    const unsubscribe = source.subscribe((event) => {
+      for (const listener of listenersRef.current) listener(event);
+    });
+    sourceRef.current = source;
     return () => {
+      unsubscribe();
       sourceRef.current = null;
     };
   }, [engine]);
@@ -43,6 +50,10 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
     },
     cueBeat: async () => {
       sourceRef.current?.cueBeat();
+    },
+    subscribe: (listener) => {
+      listenersRef.current.add(listener);
+      return () => listenersRef.current.delete(listener);
     },
   };
 }

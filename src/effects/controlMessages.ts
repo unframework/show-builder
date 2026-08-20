@@ -12,8 +12,8 @@ export const controlCommand = z.discriminatedUnion('type', [
 ]);
 export type ControlCommand = z.infer<typeof controlCommand>;
 
-// Runner → control UI: current knob state, snapshotted on connect and rebroadcast
-// after every command so multiple controllers stay in sync.
+// Current knob state, snapshotted on connect and re-emitted after every change so
+// multiple controllers stay in sync.
 export const controlState = z.object({
   type: z.literal('state'),
   effect: demoEffectId,
@@ -21,3 +21,9 @@ export const controlState = z.object({
   bpm: z.number(),
 });
 export type ControlState = z.infer<typeof controlState>;
+
+export const controlBeat = z.object({ type: z.literal('beat'), beat: z.number() });
+export type ControlBeat = z.infer<typeof controlBeat>;
+
+export const effectEvent = z.discriminatedUnion('type', [controlState, controlBeat]);
+export type EffectEvent = z.infer<typeof effectEvent>;

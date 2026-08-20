@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
-import { controlCommand, type ControlState } from '../effects/controlMessages';
+import { controlCommand, type EffectEvent } from '../effects/controlMessages';
 import type { EffectSource } from '../effects/EffectSource';
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -25,7 +25,7 @@ export interface ControlServerOptions {
 // Serves the built control UI over HTTP and relays its commands to the running
 // EffectSource, rebroadcasting the resulting knob state to every connected UI.
 export function startControlServer({ host, port, uiDir, source }: ControlServerOptions): void {
-  const state: ControlState = { type: 'state', effect: 'zone', speed: 1, bpm: 120 };
+  let latestState = source.getState();
 
   const server = createServer((req, res) => {
     const rel = normalize(decodeURIComponent((req.url ?? '/').split('?')[0]));
@@ -34,15 +34,20 @@ export function startControlServer({ host, port, uiDir, source }: ControlServerO
   });
 
   const wss = new WebSocketServer({ server, path: '/fx' });
-  const broadcast = (): void => {
-    const msg = JSON.stringify(state);
+  const broadcast = (event: EffectEvent): void => {
+    const msg = JSON.stringify(event);
     for (const client of wss.clients) {
       if (client.readyState === WebSocket.OPEN) client.send(msg);
     }
   };
 
+  source.subscribe((event) => {
+    if (event.type === 'state') latestState = event;
+    broadcast(event);
+  });
+
   wss.on('connection', (ws) => {
-    ws.send(JSON.stringify(state));
+    ws.send(JSON.stringify(latestState));
     ws.on('message', (data) => {
       const parsed = controlCommand.safeParse(JSON.parse(data.toString()));
       if (!parsed.success) return;
@@ -50,21 +55,17 @@ export function startControlServer({ host, port, uiDir, source }: ControlServerO
       switch (cmd.type) {
         case 'set-effect':
           source.setEffect(cmd.id);
-          state.effect = cmd.id;
           break;
         case 'set-speed':
           source.setSpeed(cmd.speed);
-          state.speed = cmd.speed;
           break;
         case 'set-bpm':
           source.setBpm(cmd.bpm);
-          state.bpm = cmd.bpm;
           break;
         case 'cue-beat':
           source.cueBeat();
-          return;
+          break;
       }
-      broadcast();
     });
   });
 
