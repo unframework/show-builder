@@ -17,7 +17,8 @@ const PIXEL_MAP_DIR = process.env.PIXEL_MAP_DIR ?? join(REPO_ROOT, 'pixel-map');
 const UI_DIR = process.env.RUNNER_UI_DIR ?? join(REPO_ROOT, 'dist');
 const SACN_HOST = process.env.SACN_HOST ?? '127.0.0.1';
 const SACN_PORT = Number(process.env.SACN_PORT ?? 5568);
-const CONTROL_PORT = Number(process.env.RUNNER_PORT ?? 3002);
+const RUNNER_HOST = process.env.RUNNER_HOST ?? '0.0.0.0';
+const RUNNER_PORT = Number(process.env.RUNNER_PORT ?? 3002);
 const FPS = Number(process.env.RUNNER_FPS ?? 40);
 
 interface RawLed {
@@ -109,7 +110,7 @@ async function main(): Promise<void> {
     last = now;
   }, 1000 / FPS);
 
-  startControlServer({ port: CONTROL_PORT, uiDir: UI_DIR, source });
+  startControlServer({ host: RUNNER_HOST, port: RUNNER_PORT, uiDir: UI_DIR, source });
   console.log(`[runner] ${pixels.length} pixels → sACN ${SACN_HOST}:${SACN_PORT} @ ${FPS}fps`);
 }
 

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import type { Vec3 } from '../scene/coords';
-import { computeBounds, normalizePoint, type Bounds, type PixelDescriptor } from '../scene/normalize';
+import {
+  computeBounds,
+  normalizePoint,
+  type Bounds,
+  type PixelDescriptor,
+} from '../scene/normalize';
 
 export { normalizePoint, computeBounds } from '../scene/normalize';
 export type { Bounds, PixelDescriptor } from '../scene/normalize';

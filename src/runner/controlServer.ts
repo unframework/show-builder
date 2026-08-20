@@ -16,6 +16,7 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 export interface ControlServerOptions {
+  host: string;
   port: number;
   uiDir: string;
   source: EffectSource;
@@ -23,7 +24,7 @@ export interface ControlServerOptions {
 
 // Serves the built control UI over HTTP and relays its commands to the running
 // EffectSource, rebroadcasting the resulting knob state to every connected UI.
-export function startControlServer({ port, uiDir, source }: ControlServerOptions): void {
+export function startControlServer({ host, port, uiDir, source }: ControlServerOptions): void {
   const state: ControlState = { type: 'state', effect: 'zone', speed: 1, bpm: 120 };
 
   const server = createServer((req, res) => {
@@ -67,7 +68,11 @@ export function startControlServer({ port, uiDir, source }: ControlServerOptions
     });
   });
 
-  server.listen(port, () => console.log(`[runner] control UI on http://localhost:${port}`));
+  server.listen(port, host, () =>
+    console.log(
+      `[runner] control UI on http://${host === '0.0.0.0' ? '<this-host>' : host}:${port}`,
+    ),
+  );
 }
 
 async function serveFile(path: string, res: ServerResponse): Promise<void> {
