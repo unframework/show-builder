@@ -21,6 +21,7 @@ Other scripts: `npm run build` (`tsc -b && vite build`). Run `npm run format`, `
 ## Layout & conventions
 
 - `src/engine/` — imperative Three.js (scene, render loop, per-zone builders under `build/`).
+- `src/effects/` — the portable effect core, framework-free (no Three, no DOM) so it runs in the browser or Node. `demoEffects.ts` holds the pure position/time effect functions (including `noise` blobs); `EffectSource` evaluates the selected effect per pixel and packs DMX universe buffers, advanced by an injected `renderFrame(dt)` clock. Controls sit behind the async `EffectControl` contract, satisfied in-tab by direct calls (`useEffectSource`) and later by a WebSocket adapter.
 - `src/relay/` — relay data frame reception.
 - `src/components/` — misc UI chrome.
 - `pixel-map/*.json` — LED positions, rendered by the engine.
