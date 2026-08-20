@@ -1,0 +1,17 @@
+[Unit]
+Description=Gothic Folly effects runner (LED control UI + sACN output)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/gothic-folly-runner
+Environment=RUNNER_HOST=0.0.0.0
+Environment=RUNNER_PORT=3002
+ExecStart=/usr/bin/node /opt/gothic-folly-runner/start.mjs
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
