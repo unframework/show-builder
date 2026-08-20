@@ -8,6 +8,8 @@ export interface EffectControl {
   setEffect(id: DemoEffectId): Promise<void>;
   setSpeed(speed: number): Promise<void>;
   setBpm(bpm: number): Promise<void>;
+  // Halt phase advance and emission; the beat clock keeps running
+  setRunning(running: boolean): Promise<void>;
   // Anchor the beat clock to the downbeat
   cueBeat(): Promise<void>;
   // Observe engine events (state, beats). Returns an unsubscribe.

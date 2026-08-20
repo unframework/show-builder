@@ -25,6 +25,7 @@ export class EffectSource {
 
   private effect: DemoEffect = DEMO_EFFECT_BY_ID.get('zone')!;
   private effectId: DemoEffectId = 'zone';
+  private running = true;
   private speed = 1;
   private phase = 0;
   private bpm = 120;
@@ -50,7 +51,13 @@ export class EffectSource {
   }
 
   getState(): ControlState {
-    return { type: 'state', effect: this.effectId, speed: this.speed, bpm: this.bpm };
+    return {
+      type: 'state',
+      effect: this.effectId,
+      running: this.running,
+      speed: this.speed,
+      bpm: this.bpm,
+    };
   }
 
   private notify(event: EffectEvent): void {
@@ -63,6 +70,13 @@ export class EffectSource {
 
     this.effect = effect;
     this.effectId = id;
+    this.notify(this.getState());
+  }
+
+  setRunning(running: boolean): void {
+    if (running === this.running) return;
+
+    this.running = running;
     this.notify(this.getState());
   }
 
@@ -93,8 +107,6 @@ export class EffectSource {
   }
 
   renderFrame(dt: number): void {
-    this.phase += dt * this.speed;
-
     const advance = (dt * this.bpm) / 60;
     const ease = this.beatNudge * Math.min(1, advance);
     this.beatNudge -= ease;
@@ -103,6 +115,10 @@ export class EffectSource {
     const beat = Math.floor(this.beat);
 
     if (beat > prevBeat) this.notify({ type: 'beat', beat });
+
+    if (!this.running) return;
+
+    this.phase += dt * this.speed;
 
     const { hsl } = this.effect;
     for (const p of this.pixels) {

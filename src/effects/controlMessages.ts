@@ -8,6 +8,7 @@ export const controlCommand = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set-effect'), id: demoEffectId }),
   z.object({ type: z.literal('set-speed'), speed: z.number() }),
   z.object({ type: z.literal('set-bpm'), bpm: z.number() }),
+  z.object({ type: z.literal('set-running'), running: z.boolean() }),
   z.object({ type: z.literal('cue-beat') }),
 ]);
 export type ControlCommand = z.infer<typeof controlCommand>;
@@ -17,6 +18,7 @@ export type ControlCommand = z.infer<typeof controlCommand>;
 export const controlState = z.object({
   type: z.literal('state'),
   effect: demoEffectId,
+  running: z.boolean(),
   speed: z.number(),
   bpm: z.number(),
 });

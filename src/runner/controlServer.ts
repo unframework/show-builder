@@ -62,6 +62,9 @@ export function startControlServer({ host, port, uiDir, source }: ControlServerO
         case 'set-bpm':
           source.setBpm(cmd.bpm);
           break;
+        case 'set-running':
+          source.setRunning(cmd.running);
+          break;
         case 'cue-beat':
           source.cueBeat();
           break;

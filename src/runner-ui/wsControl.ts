@@ -43,6 +43,7 @@ export function createWsControl(url: string, handlers: WsControlHandlers): WsCon
     setEffect: (id) => send({ type: 'set-effect', id }),
     setSpeed: (speed) => send({ type: 'set-speed', speed }),
     setBpm: (bpm) => send({ type: 'set-bpm', bpm }),
+    setRunning: (running) => send({ type: 'set-running', running }),
     cueBeat: () => send({ type: 'cue-beat' }),
     subscribe: (listener) => {
       listeners.add(listener);

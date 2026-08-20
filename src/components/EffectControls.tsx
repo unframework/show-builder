@@ -7,6 +7,7 @@ import { useTapTempo } from './useTapTempo';
 
 export function EffectControls({ source }: { source: EffectControl }) {
   const [effect, setEffect] = useState<DemoEffectId>('zone');
+  const [running, setRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [bpm, setBpm] = useState(120);
   const [pulse, setPulse] = useState(0);
@@ -45,6 +46,7 @@ export function EffectControls({ source }: { source: EffectControl }) {
           return;
         }
         setEffect(event.effect);
+        setRunning(event.running);
         setSpeed(event.speed);
         setBpm(event.bpm);
       }),
@@ -56,6 +58,17 @@ export function EffectControls({ source }: { source: EffectControl }) {
       <div className="flex flex-wrap gap-4">
         <div className="min-w-0 flex-1 basis-80">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <button
+              className={clsx('btn btn-lg', running ? 'btn-error' : 'btn-success')}
+              onClick={() => {
+                const next = !running;
+                setRunning(next);
+                void source.setRunning(next);
+              }}
+            >
+              {running ? 'STOP' : 'START'}
+            </button>
+
             <div className="inline-flex items-center gap-x-4">
               <span className="text-base opacity-50">EFFECT</span>
               <select

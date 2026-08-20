@@ -25,6 +25,6 @@ Other scripts: `npm run build` (`tsc -b && vite build`). Run `npm run format`, `
 - `src/effects/` — the portable effect core, runs in the browser or Node.
 - `src/relay/` — relay data frame reception.
 - `src/components/` — misc UI chrome.
-- `src/runner/` — headless effects engine runner for output to real hardware (or sim).
+- `src/runner/` — headless effects engine runner for output to real hardware (or sim). See `runner.md` for running/deploying via `./deploy/deploy.sh`.
 - `src/runner-ui/` — UI for the headless effects engine runner.
 - `pixel-map/*.json` — LED positions, rendered by the engine.
