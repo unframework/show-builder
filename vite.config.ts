@@ -40,6 +40,10 @@ function servePixelMap(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), servePixelMap()],
+  server: {
+    host: '127.0.0.1',
+    allowedHosts: ['.ts.net'],
+  },
   build: {
     rollupOptions: {
       input: { cathedral: join(import.meta.dirname, 'cathedral.html') },
