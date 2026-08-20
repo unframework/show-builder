@@ -7,7 +7,7 @@ export function EffectControls({ source }: { source: EffectControl }) {
   const [speed, setSpeed] = useState(1);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <span className="text-xs opacity-50">EFFECT</span>
       <select
         className="select select-sm select-bordered"

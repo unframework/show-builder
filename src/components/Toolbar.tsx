@@ -1,6 +1,4 @@
 import type { CathedralEngine } from '../engine/CathedralEngine';
-import type { EffectControl } from '../effects/effectControl';
-import { EffectControls } from './EffectControls';
 import { SimSwitcher } from './SimSwitcher';
 import { ZoneToggles } from './ZoneToggles';
 
@@ -10,12 +8,10 @@ function Divider() {
 
 export function Toolbar({
   engine,
-  effectSource,
   isLive,
   onToggleNav,
 }: {
   engine: CathedralEngine;
-  effectSource: EffectControl;
   isLive: boolean;
   onToggleNav: () => void;
 }) {
@@ -31,8 +27,6 @@ export function Toolbar({
       <SimSwitcher />
       <Divider />
       <ZoneToggles engine={engine} />
-      <Divider />
-      <EffectControls source={effectSource} />
       {isLive && (
         <span className="badge badge-success gap-1" title="Receiving live data from relay">
           ● LIVE

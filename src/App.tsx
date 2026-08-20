@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EffectsPanel } from './components/EffectsPanel';
 import { Sidenav } from './components/Sidenav';
 import { Toolbar } from './components/Toolbar';
 import { XmlModal } from './components/XmlModal';
@@ -19,7 +20,6 @@ export function App() {
       {engine && (
         <Toolbar
           engine={engine}
-          effectSource={effectSource}
           isLive={relay.isLive}
           onToggleNav={() => setNavOpen((open) => !open)}
         />
@@ -36,6 +36,7 @@ export function App() {
         />
         <div className="canvas-wrap relative flex-1 overflow-hidden" ref={setContainer} />
       </div>
+      {engine && <EffectsPanel source={effectSource} />}
 
       {!engine && (
         <div className="fixed inset-0 grid place-items-center text-sm">
