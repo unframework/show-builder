@@ -7,6 +7,9 @@ type Emit = (universe: number, bytes: Uint8Array) => void;
 
 const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
 
+// Avoid double-flash when re-cueing the beat this close to the downbeat.
+const CUE_NUDGE_MAX_SEC = 0.2;
+
 // Procedural frame source: the effect analogue of the relay. Iterates every
 // pixel, evaluates the selected effect at the current phase, packs the result
 // into 8-bit DMX universe buffers, and pushes them through the same ingest the
@@ -22,6 +25,7 @@ export class EffectSource {
   private phase = 0;
   private bpm = 120;
   private beat = 0;
+  private beatNudge = 0;
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit) {
     this.pixels = pixels;
@@ -50,12 +54,24 @@ export class EffectSource {
   }
 
   cueBeat(): void {
-    this.beat = 0;
+    const error = this.beat - Math.round(this.beat);
+    if (error > 0 && (error * 60) / this.bpm <= CUE_NUDGE_MAX_SEC) {
+      // Downbeat just fired: ease onto the tapped grid so we don't re-fire.
+      this.beatNudge = -error;
+    } else {
+      // About to happen, or long enough since the last: hit the downbeat now.
+      this.beat = 0;
+      this.beatNudge = 0;
+    }
   }
 
   renderFrame(dt: number): void {
     this.phase += dt * this.speed;
-    this.beat += (dt * this.bpm) / 60;
+
+    const advance = (dt * this.bpm) / 60;
+    const ease = this.beatNudge * Math.min(1, advance);
+    this.beatNudge -= ease;
+    this.beat += advance + ease;
 
     const { hsl } = this.effect;
     for (const p of this.pixels) {

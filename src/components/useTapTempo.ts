@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // A gap longer than this ends the current phrase; the next tap starts fresh.
 const PHRASE_GAP_MS = 2000;
-const WINDOW = 8;
+const WINDOW = 16;
 const MIN_BPM = 30;
 const MAX_BPM = 300;
 // Intervals further than this fraction from the median are off-beat re-cues, not
