@@ -27,7 +27,7 @@ export function EffectControls({ source }: { source: EffectControl }) {
 
       <span className="text-xs opacity-50">SPEED</span>
       <input
-        className="range range-xs range-warning w-60"
+        className="range range-xs range-warning w-32 sm:w-60"
         type="range"
         min={0.1}
         max={3}

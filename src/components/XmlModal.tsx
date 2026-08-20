@@ -24,7 +24,7 @@ export function XmlModal({ name, fetchXml, onClose }: XmlModalProps) {
 
   return (
     <div className="modal modal-open">
-      <div className="modal-box flex h-[80vh] w-[80vw] max-w-[80vw] flex-col p-0">
+      <div className="modal-box flex h-[85dvh] w-[92vw] max-w-3xl flex-col p-0">
         <div className="flex items-center justify-between border-b border-base-300 bg-base-200 px-4 py-2 text-sm">
           <span>{name}</span>
           <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose}>

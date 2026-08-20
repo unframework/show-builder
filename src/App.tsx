@@ -12,15 +12,25 @@ export function App() {
   const relay = useRelay(engine);
   const effectSource = useEffectSource(engine, relay.isLive);
   const [xmlName, setXmlName] = useState<string | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-base-300">
-      {engine && <Toolbar engine={engine} effectSource={effectSource} isLive={relay.isLive} />}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden bg-base-300">
+      {engine && (
+        <Toolbar
+          engine={engine}
+          effectSource={effectSource}
+          isLive={relay.isLive}
+          onToggleNav={() => setNavOpen((open) => !open)}
+        />
+      )}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <Sidenav
           sequences={relay.sequences}
           nowPlaying={relay.nowPlaying}
           connected={relay.connected}
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
           onSelect={relay.selectSequence}
           onViewXml={setXmlName}
         />

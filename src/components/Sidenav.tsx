@@ -6,48 +6,70 @@ interface SidenavProps {
   sequences: string[];
   nowPlaying: NowPlaying;
   connected: boolean;
+  open: boolean;
+  onClose: () => void;
   onSelect: (name: string) => void;
   onViewXml: (name: string) => void;
 }
 
-export function Sidenav({ sequences, nowPlaying, connected, onSelect, onViewXml }: SidenavProps) {
+export function Sidenav({
+  sequences,
+  nowPlaying,
+  connected,
+  open,
+  onClose,
+  onSelect,
+  onViewXml,
+}: SidenavProps) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-base-300 bg-base-200">
-      <h3 className="px-4 py-2 text-xs uppercase tracking-wide opacity-50">Sequences</h3>
-      <ul
+    <>
+      {open && <div className="absolute inset-0 z-20 bg-black/50 lg:hidden" onClick={onClose} />}
+      <aside
         className={clsx(
-          'menu w-full flex-1 flex-nowrap gap-0.5 overflow-y-auto',
-          !connected && 'pointer-events-none opacity-40',
+          'absolute inset-y-0 left-0 z-30 flex w-64 flex-col overflow-hidden border-r border-base-300 bg-base-200 transition-transform duration-200',
+          'lg:static lg:z-auto lg:shrink-0 lg:translate-x-0',
+          open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        {sequences.map((name) => {
-          const current = name === nowPlaying.name;
-          return (
-            <li key={name}>
-              <a
-                className={clsx('flex items-center gap-2', current && 'menu-active')}
-                onClick={() => onSelect(name)}
-              >
-                <StatusDot current={current} status={nowPlaying.status} />
-                <span className="flex-1 truncate text-xs" title={name}>
-                  {name}
-                </span>
-                <button
-                  className="btn btn-ghost btn-xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewXml(name);
+        <h3 className="px-4 py-2 text-xs uppercase tracking-wide opacity-50">Sequences</h3>
+        <ul
+          className={clsx(
+            'menu w-full flex-1 flex-nowrap gap-0.5 overflow-y-auto',
+            !connected && 'pointer-events-none opacity-40',
+          )}
+        >
+          {sequences.map((name) => {
+            const current = name === nowPlaying.name;
+            return (
+              <li key={name}>
+                <a
+                  className={clsx('flex items-center gap-2', current && 'menu-active')}
+                  onClick={() => {
+                    onSelect(name);
+                    onClose();
                   }}
                 >
-                  XML
-                </button>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-      <StatusFooter connected={connected} nowPlaying={nowPlaying} />
-    </aside>
+                  <StatusDot current={current} status={nowPlaying.status} />
+                  <span className="flex-1 truncate text-xs" title={name}>
+                    {name}
+                  </span>
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewXml(name);
+                    }}
+                  >
+                    XML
+                  </button>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+        <StatusFooter connected={connected} nowPlaying={nowPlaying} />
+      </aside>
+    </>
   );
 }
 
