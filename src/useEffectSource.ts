@@ -1,42 +1,42 @@
 import { useEffect, useRef } from 'react';
 import type { CathedralEngine } from './engine/CathedralEngine';
-import { EffectSource } from './engine/EffectSource';
-import type { DemoEffectId } from './engine/demoEffects';
-
-export interface EffectSourceHandle {
-  setEffect: (id: DemoEffectId) => void;
-  setSpeed: (speed: number) => void;
-}
+import { EffectSource } from './effects/EffectSource';
+import type { EffectControl } from './effects/effectControl';
 
 // Drives the procedural EffectSource, which feeds the engine whenever the relay
-// is idle. Live frames win: the source runs only while `isLive` is false.
-export function useEffectSource(
-  engine: CathedralEngine | null,
-  isLive: boolean,
-): EffectSourceHandle {
+// is idle. Live frames win: the rAF loop runs only while `isLive` is false.
+export function useEffectSource(engine: CathedralEngine | null, isLive: boolean): EffectControl {
   const sourceRef = useRef<EffectSource | null>(null);
 
   useEffect(() => {
     if (!engine) return;
-    const source = new EffectSource(engine.getPixels(), engine.getFocus(), (u, bytes) =>
+    sourceRef.current = new EffectSource(engine.getPixels(), engine.getFocus(), (u, bytes) =>
       engine.applyUniverse(u, bytes),
     );
-    sourceRef.current = source;
     return () => {
-      source.stop();
       sourceRef.current = null;
     };
   }, [engine]);
 
   useEffect(() => {
-    const source = sourceRef.current;
-    if (!source) return;
-    if (isLive) source.stop();
-    else source.start();
+    if (!engine || isLive) return;
+    let frame = 0;
+    let lastTs: number | null = null;
+    const tick = (ts: number): void => {
+      frame = requestAnimationFrame(tick);
+      sourceRef.current?.renderFrame(lastTs === null ? 0 : (ts - lastTs) / 1000);
+      lastTs = ts;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [engine, isLive]);
 
   return {
-    setEffect: (id) => sourceRef.current?.setEffect(id),
-    setSpeed: (speed) => sourceRef.current?.setSpeed(speed),
+    setEffect: async (id) => {
+      sourceRef.current?.setEffect(id);
+    },
+    setSpeed: async (speed) => {
+      sourceRef.current?.setSpeed(speed);
+    },
   };
 }

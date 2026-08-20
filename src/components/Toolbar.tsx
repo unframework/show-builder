@@ -1,5 +1,5 @@
 import type { CathedralEngine } from '../engine/CathedralEngine';
-import type { EffectSourceHandle } from '../useEffectSource';
+import type { EffectControl } from '../effects/effectControl';
 import { EffectControls } from './EffectControls';
 import { SimSwitcher } from './SimSwitcher';
 import { ZoneToggles } from './ZoneToggles';
@@ -14,7 +14,7 @@ export function Toolbar({
   isLive,
 }: {
   engine: CathedralEngine;
-  effectSource: EffectSourceHandle;
+  effectSource: EffectControl;
   isLive: boolean;
 }) {
   return (

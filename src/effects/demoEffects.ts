@@ -1,5 +1,5 @@
 import { createNoise4D } from 'simplex-noise';
-import type { Vec3 } from './coords';
+import type { Vec3 } from '../engine/coords';
 
 export type DemoEffectId =
   'zone' | 'lr-sweep' | 'rise' | 'fb-sweep' | 'radial' | 'twinkle' | 'noise';

@@ -1,7 +1,7 @@
-import * as THREE from 'three';
-import type { Vec3 } from './coords';
+import type { Vec3 } from '../engine/coords';
+import type { PixelDescriptor } from '../engine/targets';
+import { hslToRgb } from './color';
 import { DEMO_EFFECT_BY_ID, type DemoEffect, type DemoEffectId } from './demoEffects';
-import type { PixelDescriptor } from './targets';
 
 type Emit = (universe: number, bytes: Uint8Array) => void;
 
@@ -10,19 +10,16 @@ const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)))
 // Procedural frame source: the effect analogue of the relay. Iterates every
 // pixel, evaluates the selected effect at the current phase, packs the result
 // into 8-bit DMX universe buffers, and pushes them through the same ingest the
-// relay uses. Runs on its own animation clock while active.
+// relay uses. Environment-agnostic: a driver advances it via `renderFrame`.
 export class EffectSource {
   private readonly pixels: PixelDescriptor[];
   private readonly focus: Vec3;
   private readonly emit: Emit;
   private readonly buffers = new Map<number, Uint8Array>();
-  private readonly color = new THREE.Color();
 
   private effect: DemoEffect = DEMO_EFFECT_BY_ID.get('zone')!;
   private speed = 1;
   private phase = 0;
-  private lastTs: number | null = null;
-  private frameHandle = 0;
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit) {
     this.pixels = pixels;
@@ -46,21 +43,8 @@ export class EffectSource {
     this.speed = speed;
   }
 
-  start(): void {
-    if (this.frameHandle) return;
-    this.lastTs = null;
-    this.frameHandle = requestAnimationFrame(this.tick);
-  }
-
-  stop(): void {
-    cancelAnimationFrame(this.frameHandle);
-    this.frameHandle = 0;
-  }
-
-  private tick = (ts: number): void => {
-    this.frameHandle = requestAnimationFrame(this.tick);
-    if (this.lastTs !== null) this.phase += ((ts - this.lastTs) / 1000) * this.speed;
-    this.lastTs = ts;
+  renderFrame(dt: number): void {
+    this.phase += dt * this.speed;
 
     const { hsl } = this.effect;
     for (const p of this.pixels) {
@@ -79,12 +63,12 @@ export class EffectSource {
         twinkleOffset: p.twinkleOffset,
         focus: this.focus,
       });
-      this.color.setHSL(h, s, l);
-      bytes[p.ch0] = clampByte(this.color.r);
-      bytes[p.ch0 + 1] = clampByte(this.color.g);
-      bytes[p.ch0 + 2] = clampByte(this.color.b);
+      const [r, g, b] = hslToRgb(h, s, l);
+      bytes[p.ch0] = clampByte(r);
+      bytes[p.ch0 + 1] = clampByte(g);
+      bytes[p.ch0 + 2] = clampByte(b);
     }
 
     for (const [universe, bytes] of this.buffers) this.emit(universe, bytes);
-  };
+  }
 }

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { DEMO_EFFECTS, type DemoEffectId } from '../engine/demoEffects';
-import type { EffectSourceHandle } from '../useEffectSource';
+import { DEMO_EFFECTS, type DemoEffectId } from '../effects/demoEffects';
+import type { EffectControl } from '../effects/effectControl';
 
-export function EffectControls({ source }: { source: EffectSourceHandle }) {
+export function EffectControls({ source }: { source: EffectControl }) {
   const [effect, setEffect] = useState<DemoEffectId>('zone');
   const [speed, setSpeed] = useState(1);
 
@@ -15,7 +15,7 @@ export function EffectControls({ source }: { source: EffectSourceHandle }) {
         onChange={(e) => {
           const id = e.target.value as DemoEffectId;
           setEffect(id);
-          source.setEffect(id);
+          void source.setEffect(id);
         }}
       >
         {DEMO_EFFECTS.map((eff) => (
@@ -36,7 +36,7 @@ export function EffectControls({ source }: { source: EffectSourceHandle }) {
         onChange={(e) => {
           const v = Number(e.target.value);
           setSpeed(v);
-          source.setSpeed(v);
+          void source.setSpeed(v);
         }}
       />
     </div>
