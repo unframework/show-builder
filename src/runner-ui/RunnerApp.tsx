@@ -22,15 +22,15 @@ export function RunnerApp() {
   }, []);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-base-100 text-base-content">
-      <header className="flex items-center justify-between px-4 py-3">
-        <h1 className="text-sm font-semibold uppercase tracking-wide">Effect Runner</h1>
+    <div className="flex min-h-dvh flex-col bg-base-300 text-base-content">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-base-100">
+        <h1 className="text-sm font-semibold uppercase tracking-wide">The Gothic Folly</h1>
         <span className={clsx('badge badge-sm', connected ? 'badge-success' : 'badge-error')}>
           {connected ? '● CONNECTED' : '○ OFFLINE'}
         </span>
       </header>
       {control && (
-        <div className="mt-auto border-t border-base-300">
+        <div className="mb-auto">
           <EffectControls source={control} />
         </div>
       )}
