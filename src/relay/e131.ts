@@ -27,9 +27,18 @@ export class SacnOutput {
   private readonly sequence = new Map<number, number>();
 
   constructor(
-    private readonly host: string,
-    private readonly port: number,
+    private host: string,
+    private port: number,
   ) {}
+
+  get destination(): { host: string; port: number } {
+    return { host: this.host, port: this.port };
+  }
+
+  setDestination(host: string, port: number): void {
+    this.host = host;
+    this.port = port;
+  }
 
   emit = (universe: number, bytes: Uint8Array): void => {
     const seq = ((this.sequence.get(universe) ?? 0) + 1) & 0xff;

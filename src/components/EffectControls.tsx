@@ -45,6 +45,7 @@ export function EffectControls({ source }: { source: EffectControl }) {
           setBeatFlash((n) => n + 1);
           return;
         }
+        if (event.type !== 'state') return;
         setEffect(event.effect);
         setRunning(event.running);
         setSpeed(event.speed);

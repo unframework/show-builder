@@ -4,6 +4,8 @@ import type { EffectControl } from '../effects/effectControl';
 const RECONNECT_MS = 3000;
 
 export interface WsControl extends EffectControl {
+  // Repoint the runner's sACN output; runner-only, absent from the in-tab adapter.
+  setOutput(host: string, port: number): Promise<void>;
   close(): void;
 }
 
@@ -44,6 +46,7 @@ export function createWsControl(url: string, handlers: WsControlHandlers): WsCon
     setSpeed: (speed) => send({ type: 'set-speed', speed }),
     setBpm: (bpm) => send({ type: 'set-bpm', bpm }),
     setRunning: (running) => send({ type: 'set-running', running }),
+    setOutput: (host, port) => send({ type: 'set-output', host, port }),
     cueBeat: () => send({ type: 'cue-beat' }),
     subscribe: (listener) => {
       listeners.add(listener);

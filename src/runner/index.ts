@@ -11,6 +11,7 @@ import { assemblePixelMap, type PixelMap } from '../scene/pixelData';
 import { runBuilders } from '../scene/runBuilders';
 import { ZONE_DEFS, type ZoneId } from '../scene/zones';
 import { startControlServer } from './controlServer';
+import { createSettingsSaver, loadSettings, resolveStateDir } from './settingsStore';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PIXEL_MAP_DIR = process.env.PIXEL_MAP_DIR ?? join(REPO_ROOT, 'pixel-map');
@@ -100,8 +101,27 @@ async function main(): Promise<void> {
   });
   const { pixels, focus } = buildDescriptors(map);
 
-  const output = new SacnOutput(SACN_HOST, SACN_PORT);
+  const stateDir = resolveStateDir();
+  const saved = await loadSettings(stateDir);
+  const saver = createSettingsSaver(stateDir);
+
+  const output = new SacnOutput(saved.sacnHost ?? SACN_HOST, saved.sacnPort ?? SACN_PORT);
   const source = new EffectSource(pixels, focus, output.emit);
+  if (saved.effect) source.setEffect(saved.effect);
+  if (saved.speed !== undefined) source.setSpeed(saved.speed);
+  if (saved.bpm !== undefined) source.setBpm(saved.bpm);
+  if (saved.running !== undefined) source.setRunning(saved.running);
+
+  const persist = (): void => {
+    const { host, port } = output.destination;
+    const { effect, running, speed, bpm } = source.getState();
+    saver.save({ sacnHost: host, sacnPort: port, effect, running, speed, bpm });
+  };
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+      void saver.flush().finally(() => process.exit(0));
+    });
+  }
 
   let last = Date.now();
   setInterval(() => {
@@ -110,8 +130,16 @@ async function main(): Promise<void> {
     last = now;
   }, 1000 / FPS);
 
-  startControlServer({ host: RUNNER_HOST, port: RUNNER_PORT, uiDir: UI_DIR, source });
-  console.log(`[runner] ${pixels.length} pixels → sACN ${SACN_HOST}:${SACN_PORT} @ ${FPS}fps`);
+  startControlServer({
+    host: RUNNER_HOST,
+    port: RUNNER_PORT,
+    uiDir: UI_DIR,
+    source,
+    output,
+    onPersist: persist,
+  });
+  const { host: sacnHost, port: sacnPort } = output.destination;
+  console.log(`[runner] ${pixels.length} pixels → sACN ${sacnHost}:${sacnPort} @ ${FPS}fps`);
 }
 
 void main().catch((err) => {

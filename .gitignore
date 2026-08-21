@@ -9,6 +9,9 @@ node_modules/
 dist/
 dist-runner/
 
+# Runner persisted settings (dev fallback dir)
+.runner-state/
+
 # xLights render output (regenerated from .xsq via headless CLI)
 xlights/*.fseq
 

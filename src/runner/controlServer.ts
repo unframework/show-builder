@@ -3,8 +3,9 @@ import { stat } from 'node:fs/promises';
 import { createServer, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
-import { controlCommand, type EffectEvent } from '../effects/controlMessages';
+import { controlCommand, type ControlOutput, type EffectEvent } from '../effects/controlMessages';
 import type { EffectSource } from '../effects/EffectSource';
+import type { SacnOutput } from '../relay/e131';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -20,12 +21,25 @@ export interface ControlServerOptions {
   port: number;
   uiDir: string;
   source: EffectSource;
+  output: SacnOutput;
+  onPersist: () => void;
 }
 
 // Serves the built control UI over HTTP and relays its commands to the running
 // EffectSource, rebroadcasting the resulting knob state to every connected UI.
-export function startControlServer({ host, port, uiDir, source }: ControlServerOptions): void {
+export function startControlServer({
+  host,
+  port,
+  uiDir,
+  source,
+  output,
+  onPersist,
+}: ControlServerOptions): void {
   let latestState = source.getState();
+  const outputEvent = (): ControlOutput => {
+    const { host: sacnHost, port: sacnPort } = output.destination;
+    return { type: 'output', sacnHost, sacnPort };
+  };
 
   const server = createServer((req, res) => {
     const rel = normalize(decodeURIComponent((req.url ?? '/').split('?')[0]));
@@ -42,12 +56,16 @@ export function startControlServer({ host, port, uiDir, source }: ControlServerO
   };
 
   source.subscribe((event) => {
-    if (event.type === 'state') latestState = event;
+    if (event.type === 'state') {
+      latestState = event;
+      onPersist();
+    }
     broadcast(event);
   });
 
   wss.on('connection', (ws) => {
     ws.send(JSON.stringify(latestState));
+    ws.send(JSON.stringify(outputEvent()));
     ws.on('message', (data) => {
       const parsed = controlCommand.safeParse(JSON.parse(data.toString()));
       if (!parsed.success) return;
@@ -64,6 +82,11 @@ export function startControlServer({ host, port, uiDir, source }: ControlServerO
           break;
         case 'set-running':
           source.setRunning(cmd.running);
+          break;
+        case 'set-output':
+          output.setDestination(cmd.host, cmd.port);
+          broadcast(outputEvent());
+          onPersist();
           break;
         case 'cue-beat':
           source.cueBeat();

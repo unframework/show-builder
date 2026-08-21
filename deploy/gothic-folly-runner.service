@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 DynamicUser=yes
+StateDirectory=gothic-folly-runner
 WorkingDirectory=/opt/gothic-folly-runner
 Environment=RUNNER_HOST=0.0.0.0
 Environment=RUNNER_PORT=3002

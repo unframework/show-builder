@@ -19,8 +19,12 @@ it in the 3D sim, or point it at the real hardware.
 Needs passwordless `ssh` + `sudo` on the target. If TouchKio is installed, it's
 pointed at the runner UI as its lead page.
 
-Set the sACN target with `SACN_HOST` / `SACN_PORT` in the unit (or a drop-in).
-The UI is reachable from any device on the LAN at `http://<host>:3002/`.
+Set the sACN target with `SACN_HOST` / `SACN_PORT` in the unit (or a drop-in), or
+change it live from the control UI. The UI is reachable from any device on the LAN
+at `http://<host>:3002/`.
+
+The sACN destination and the live knobs (effect, running, speed, bpm) persist to
+`.runner-state/settings.json` (or in `/var/lib/gothic-folly-runner/`) and are restored on restart.
 
 ```bash
 ssh <host> sudo systemctl status gothic-folly-runner    # state

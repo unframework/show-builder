@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { DEMO_EFFECTS, type DemoEffectId } from './demoEffects';
 
-const demoEffectId = z.enum(DEMO_EFFECTS.map((e) => e.id) as [DemoEffectId, ...DemoEffectId[]]);
+export const demoEffectId = z.enum(
+  DEMO_EFFECTS.map((e) => e.id) as [DemoEffectId, ...DemoEffectId[]],
+);
 
 // Browser control UI → runner.
 export const controlCommand = z.discriminatedUnion('type', [
@@ -9,6 +11,7 @@ export const controlCommand = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set-speed'), speed: z.number() }),
   z.object({ type: z.literal('set-bpm'), bpm: z.number() }),
   z.object({ type: z.literal('set-running'), running: z.boolean() }),
+  z.object({ type: z.literal('set-output'), host: z.string(), port: z.number().int().positive() }),
   z.object({ type: z.literal('cue-beat') }),
 ]);
 export type ControlCommand = z.infer<typeof controlCommand>;
@@ -27,5 +30,14 @@ export type ControlState = z.infer<typeof controlState>;
 export const controlBeat = z.object({ type: z.literal('beat'), beat: z.number() });
 export type ControlBeat = z.infer<typeof controlBeat>;
 
-export const effectEvent = z.discriminatedUnion('type', [controlState, controlBeat]);
+// sACN destination, a runner-only concern: emitted on connect and after a
+// set-output command so every controller shows the live target.
+export const controlOutput = z.object({
+  type: z.literal('output'),
+  sacnHost: z.string(),
+  sacnPort: z.number(),
+});
+export type ControlOutput = z.infer<typeof controlOutput>;
+
+export const effectEvent = z.discriminatedUnion('type', [controlState, controlBeat, controlOutput]);
 export type EffectEvent = z.infer<typeof effectEvent>;
