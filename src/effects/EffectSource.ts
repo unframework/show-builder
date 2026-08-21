@@ -1,8 +1,19 @@
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import { hslToRgb } from './color';
-import type { ControlState, EffectEvent } from './controlMessages';
-import { DEMO_EFFECT_BY_ID, type DemoEffect, type DemoEffectId } from './demoEffects';
+import {
+  effectResumeState,
+  type ControlState,
+  type EffectEvent,
+  type EffectResumeState,
+} from './controlMessages';
+import {
+  createDemoEffectContext,
+  createDemoEffects,
+  type DemoEffect,
+  type DemoEffectContext,
+  type DemoEffectId,
+} from './demoEffects';
 
 type Emit = (universe: number, bytes: Uint8Array) => void;
 type Listener = (event: EffectEvent) => void;
@@ -11,6 +22,15 @@ const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)))
 
 // Avoid double-flash when re-cueing the beat this close to the downbeat.
 const CUE_NUDGE_MAX_SEC = 0.2;
+
+// Everything needed to continue an engine in place across a dev hot reload: the
+// serializable animation snapshot plus the live context to reuse (so noise
+// fields aren't reseeded). Opaque to callers — produced by getResumeState,
+// consumed by the constructor.
+export interface ResumeState {
+  snapshot: EffectResumeState;
+  context: DemoEffectContext;
+}
 
 // Procedural frame source: the effect analogue of the relay. Iterates every
 // pixel, evaluates the selected effect at the current phase, packs the result
@@ -22,8 +42,10 @@ export class EffectSource {
   private readonly emit: Emit;
   private readonly buffers = new Map<number, Uint8Array>();
   private readonly listeners = new Set<Listener>();
+  private readonly context: DemoEffectContext;
+  private readonly hslById: Record<DemoEffectId, DemoEffect['hsl']>;
 
-  private effect: DemoEffect = DEMO_EFFECT_BY_ID.get('zone')!;
+  private hsl: DemoEffect['hsl'];
   private effectId: DemoEffectId = 'zone';
   private running = true;
   private speed = 1;
@@ -32,10 +54,13 @@ export class EffectSource {
   private beat = 0;
   private beatNudge = 0;
 
-  constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit) {
+  constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit, resume?: ResumeState) {
     this.pixels = pixels;
     this.focus = focus;
     this.emit = emit;
+    this.context = resume?.context ?? createDemoEffectContext();
+    this.hslById = createDemoEffects(this.context);
+    this.hsl = this.hslById[this.effectId];
 
     const length = new Map<number, number>();
     for (const p of pixels) {
@@ -43,6 +68,8 @@ export class EffectSource {
       length.set(p.universe, Math.max(length.get(p.universe) ?? 0, need));
     }
     for (const [universe, len] of length) this.buffers.set(universe, new Uint8Array(len));
+
+    if (resume?.snapshot !== undefined) this.restore(resume.snapshot);
   }
 
   subscribe(listener: Listener): () => void {
@@ -60,16 +87,44 @@ export class EffectSource {
     };
   }
 
+  getResumeState(): ResumeState {
+    return {
+      snapshot: {
+        effect: this.effectId,
+        running: this.running,
+        speed: this.speed,
+        bpm: this.bpm,
+        phase: this.phase,
+        beat: this.beat + this.beatNudge,
+      },
+      context: this.context,
+    };
+  }
+
+  private restore(snapshot: unknown): void {
+    const parsed = effectResumeState.safeParse(snapshot);
+    if (!parsed.success) return;
+    const state = parsed.data;
+
+    this.effectId = state.effect;
+    this.hsl = this.hslById[state.effect];
+    this.running = state.running;
+    this.speed = state.speed;
+    this.bpm = state.bpm;
+    this.phase = state.phase;
+    this.beat = state.beat;
+    this.beatNudge = 0;
+  }
+
   private notify(event: EffectEvent): void {
     for (const listener of this.listeners) listener(event);
   }
 
   setEffect(id: DemoEffectId): void {
-    const effect = DEMO_EFFECT_BY_ID.get(id);
-    if (!effect || id === this.effectId) return;
+    if (id === this.effectId) return;
 
-    this.effect = effect;
     this.effectId = id;
+    this.hsl = this.hslById[id];
     this.notify(this.getState());
   }
 
@@ -120,7 +175,7 @@ export class EffectSource {
 
     this.phase += dt * this.speed;
 
-    const { hsl } = this.effect;
+    const hsl = this.hsl;
     for (const p of this.pixels) {
       const bytes = this.buffers.get(p.universe)!;
       if (!hsl) {

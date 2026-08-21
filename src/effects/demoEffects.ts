@@ -1,8 +1,5 @@
-import { createNoise4D } from 'simplex-noise';
+import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
 import type { Vec3 } from '../scene/coords';
-
-export type DemoEffectId =
-  'zone' | 'lr-sweep' | 'rise' | 'fb-sweep' | 'radial' | 'twinkle' | 'noise' | 'noise-rays';
 
 export interface EffectInput {
   xn: number;
@@ -25,6 +22,15 @@ export interface DemoEffect {
   hsl?: (input: EffectInput) => [number, number, number];
 }
 
+// stable stuff reused across hot-reloads
+export interface DemoEffectContext {
+  noise4D: NoiseFunction4D;
+}
+
+export function createDemoEffectContext(): DemoEffectContext {
+  return { noise4D: createNoise4D() };
+}
+
 const bell = (p: number) => Math.pow(Math.max(0, Math.cos(p * Math.PI)), 2);
 const wrap = (x: number) => ((x % 1) + 1) % 1;
 const band = (p: number) => 0.03 + 0.52 * bell(p);
@@ -39,7 +45,6 @@ const beatSpike = (beat: number, bpm: number, decay: number) => {
   return Math.exp(-sinceBeatSec / decay);
 };
 
-const noise4D = createNoise4D();
 const NOISE_SCALE = 6.5;
 const NOISE_TIME = 0.4;
 const NOISE_THRESHOLD = 0;
@@ -82,35 +87,35 @@ function focusWarp(x: number, y: number, z: number, focus: Vec3, zoom: number): 
   return [fx * NOISE_SCALE + dx * gain, fy * NOISE_SCALE + dy * gain, fz * NOISE_SCALE + dz * gain];
 }
 
-export const DEMO_EFFECTS: DemoEffect[] = [
+// Static id + label, safe to import anywhere (no context, no noise): the picker
+// and the control-message enum read these without instantiating an engine. This
+// list is the source of truth for DemoEffectId.
+export const DEMO_EFFECTS = [
   { id: 'zone', label: 'zone colors' },
-  {
-    id: 'lr-sweep',
-    label: 'left → right',
-    hsl: ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))],
-  },
-  {
-    id: 'rise',
-    label: 'rise',
-    hsl: ({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))],
-  },
-  {
-    id: 'fb-sweep',
-    label: 'front → back',
-    hsl: ({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))],
-  },
-  {
-    id: 'radial',
-    label: 'radial pulse',
-    hsl: ({ xn, zn, phase }) => {
+  { id: 'lr-sweep', label: 'left → right' },
+  { id: 'rise', label: 'rise' },
+  { id: 'fb-sweep', label: 'front → back' },
+  { id: 'radial', label: 'radial pulse' },
+  { id: 'twinkle', label: 'twinkle' },
+  { id: 'noise', label: 'noise blobs' },
+  { id: 'noise-rays', label: 'noise rays' },
+] as const;
+
+export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
+
+export function createDemoEffects({
+  noise4D,
+}: DemoEffectContext): Record<DemoEffectId, DemoEffect['hsl'] | undefined> {
+  return {
+    zone: undefined,
+    'lr-sweep': ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))],
+    rise: ({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))],
+    'fb-sweep': ({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))],
+    radial: ({ xn, zn, phase }) => {
       const d = Math.hypot(xn - 0.5, zn - 0.5) * Math.SQRT2;
       return [0.87, 0.9, band(wrap(d - phase * 0.25))];
     },
-  },
-  {
-    id: 'twinkle',
-    label: 'twinkle',
-    hsl: ({ phase, twinkleOffset }) => {
+    twinkle: ({ phase, twinkleOffset }) => {
       const b = Math.pow(0.5 + 0.5 * Math.sin(phase * 2.5 + twinkleOffset), 3);
       return [
         0.06 + 0.06 * Math.sin(twinkleOffset * 5),
@@ -118,11 +123,7 @@ export const DEMO_EFFECTS: DemoEffect[] = [
         0.02 + 0.55 * b,
       ];
     },
-  },
-  {
-    id: 'noise',
-    label: 'noise blobs',
-    hsl: ({ xn, yn, zn, phase, beat, bpm, focus }) => {
+    noise: ({ xn, yn, zn, phase, beat, bpm, focus }) => {
       const kick = beatSpike(beat, bpm, PULSE_DECAY);
       const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1 - PULSE_EXPAND * kick);
       const v = noise4D(sx, sy, sz, phase * NOISE_TIME);
@@ -134,11 +135,7 @@ export const DEMO_EFFECTS: DemoEffect[] = [
       const yoff = (1 - yn) * (1 - yn);
       return [-0.2 + 0.25 * amt - yoff * 0.2, 1, (0.5 + 0.1 * kick) * amt];
     },
-  },
-  {
-    id: 'noise-rays',
-    label: 'noise rays',
-    hsl: ({ xn, yn, zn, phase, beat, bpm, focus }) => {
+    'noise-rays': ({ xn, yn, zn, phase, beat, bpm, focus }) => {
       const [fx, fy, fz] = focus;
       const dx = Math.abs(xn - fx);
       const dy = yn - fy;
@@ -165,7 +162,5 @@ export const DEMO_EFFECTS: DemoEffect[] = [
         (0.5 + 0.3 * kick) * amt,
       ];
     },
-  },
-];
-
-export const DEMO_EFFECT_BY_ID = new Map(DEMO_EFFECTS.map((e) => [e.id, e]));
+  };
+}

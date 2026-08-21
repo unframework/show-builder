@@ -30,6 +30,18 @@ export type ControlState = z.infer<typeof controlState>;
 export const controlBeat = z.object({ type: z.literal('beat'), beat: z.number() });
 export type ControlBeat = z.infer<typeof controlBeat>;
 
+// Dev/HMR-only: a full engine snapshot (knobs + animation clock) carried across
+// a hot code swap so the running show resumes in place.
+export const effectResumeState = z.object({
+  effect: demoEffectId,
+  running: z.boolean(),
+  speed: z.number(),
+  bpm: z.number().positive(),
+  phase: z.number(),
+  beat: z.number(),
+});
+export type EffectResumeState = z.infer<typeof effectResumeState>;
+
 // sACN destination, a runner-only concern: emitted on connect and after a
 // set-output command so every controller shows the live target.
 export const controlOutput = z.object({
