@@ -24,6 +24,7 @@ const FPS = Number(process.env.RUNNER_FPS ?? 40);
 
 interface RawLed {
   zone: ZoneId;
+  segment: string;
   universe: number;
   ch0: number;
   world: Vec3;
@@ -33,22 +34,22 @@ interface RawLed {
 class HeadlessScene implements LedScene {
   readonly leds: RawLed[] = [];
 
-  mesh(zone: ZoneId, _outline: [number, number][], _origin: Vec3, led: Led): void {
-    this.collect(zone, led);
+  mesh(zone: ZoneId, segment: string, _outline: [number, number][], _origin: Vec3, led: Led): void {
+    this.collect(zone, segment, led);
   }
 
-  cone(zone: ZoneId, led: Led): void {
-    this.collect(zone, led);
+  cone(zone: ZoneId, segment: string, led: Led): void {
+    this.collect(zone, segment, led);
   }
 
-  points(zone: ZoneId, leds: Led[]): void {
-    for (const led of leds) this.collect(zone, led);
+  points(zone: ZoneId, segment: string, leds: Led[]): void {
+    for (const led of leds) this.collect(zone, segment, led);
   }
 
   line(): void {}
 
-  private collect(zone: ZoneId, led: Led): void {
-    this.leds.push({ zone, universe: led.universe, ch0: led.ch0, world: led.world });
+  private collect(zone: ZoneId, segment: string, led: Led): void {
+    this.leds.push({ zone, segment, universe: led.universe, ch0: led.ch0, world: led.world });
   }
 }
 
@@ -88,6 +89,8 @@ function buildDescriptors(map: PixelMap): { pixels: PixelDescriptor[]; focus: Ve
       zn,
       twinkleOffset: Math.random() * Math.PI * 2,
       base: ZONE_BASE.get(l.zone)!,
+      zone: l.zone,
+      segment: l.segment,
     };
   });
 

@@ -38,7 +38,6 @@ export interface ResumeState {
 // relay uses. Environment-agnostic: a driver advances it via `renderFrame`.
 export class EffectSource {
   private readonly pixels: PixelDescriptor[];
-  private readonly focus: Vec3;
   private readonly emit: Emit;
   private readonly buffers = new Map<number, Uint8Array>();
   private readonly listeners = new Set<Listener>();
@@ -56,10 +55,9 @@ export class EffectSource {
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit, resume?: ResumeState) {
     this.pixels = pixels;
-    this.focus = focus;
     this.emit = emit;
     this.context = resume?.context ?? createDemoEffectContext();
-    this.hslById = createDemoEffects(this.context);
+    this.hslById = createDemoEffects(this.context, pixels, focus);
     this.hsl = this.hslById[this.effectId];
 
     const length = new Map<number, number>();
@@ -176,7 +174,8 @@ export class EffectSource {
     this.phase += dt * this.speed;
 
     const hsl = this.hsl;
-    for (const p of this.pixels) {
+    for (let i = 0; i < this.pixels.length; i++) {
+      const p = this.pixels[i];
       const bytes = this.buffers.get(p.universe)!;
       if (!hsl) {
         bytes[p.ch0] = clampByte(p.base[0]);
@@ -188,11 +187,11 @@ export class EffectSource {
         xn: p.xn,
         yn: p.yn,
         zn: p.zn,
+        index: i,
         phase: this.phase,
         beat: this.beat,
         bpm: this.bpm,
         twinkleOffset: p.twinkleOffset,
-        focus: this.focus,
       });
       const [r, g, b] = hslToRgb(h, s, l);
       bytes[p.ch0] = clampByte(r);

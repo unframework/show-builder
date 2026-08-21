@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Vec3 } from '../scene/coords';
+import type { ZoneId } from '../scene/zones';
 import {
   computeBounds,
   normalizePoint,
@@ -21,6 +22,8 @@ interface LedTargetBase {
   yn: number;
   zn: number;
   twinkleOffset: number;
+  zone: ZoneId;
+  segment: string;
 }
 
 export interface PointTarget extends LedTargetBase {
@@ -45,6 +48,8 @@ export function toPixelDescriptors(targets: LedTarget[]): PixelDescriptor[] {
     zn: t.zn,
     twinkleOffset: t.twinkleOffset,
     base: [t.base.r, t.base.g, t.base.b],
+    zone: t.zone,
+    segment: t.segment,
   }));
 }
 

@@ -18,9 +18,9 @@ export interface PointStyle {
 // collector in the headless runner. Render arguments (outlines, styles) are
 // ignored by backends that only need the LED addresses.
 export interface LedScene {
-  mesh(zone: ZoneId, outline: [number, number][], origin: Vec3, led: Led): void;
-  cone(zone: ZoneId, led: Led): void;
-  points(zone: ZoneId, leds: Led[], style: PointStyle): void;
+  mesh(zone: ZoneId, segment: string, outline: [number, number][], origin: Vec3, led: Led): void;
+  cone(zone: ZoneId, segment: string, led: Led): void;
+  points(zone: ZoneId, segment: string, leds: Led[], style: PointStyle): void;
   line(zone: ZoneId, path: Vec3[]): void;
 }
 

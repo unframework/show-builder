@@ -37,7 +37,7 @@ export function buildRoseWindow(scene: LedScene, cellData: CellPolygons): void {
       const [crx, cry] = rotatePetal(cR, cT, angleDeg);
       const world: Vec3 = [WX - crx / 1000, WY + cry / 1000, WZ];
 
-      scene.mesh('roseWindow', outline, [WX, WY, WZ], { universe, ch0, world });
+      scene.mesh('roseWindow', `rose:${k}`, outline, [WX, WY, WZ], { universe, ch0, world });
     }
   }
 }

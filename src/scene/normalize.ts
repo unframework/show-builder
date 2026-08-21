@@ -1,4 +1,5 @@
 import type { Vec3 } from './coords';
+import type { ZoneId } from './zones';
 
 // A frame source's view of one LED: its DMX address, normalized position, and
 // resting zone color — everything an effect needs, minus the Three.js object.
@@ -10,6 +11,8 @@ export interface PixelDescriptor {
   zn: number;
   twinkleOffset: number;
   base: [number, number, number];
+  zone: ZoneId;
+  segment: string;
 }
 
 export interface Bounds {

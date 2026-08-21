@@ -34,7 +34,7 @@ export class SceneBuilder implements LedScene {
     }
   }
 
-  mesh(zone: ZoneId, outline: [number, number][], origin: Vec3, led: Led): void {
+  mesh(zone: ZoneId, segment: string, outline: [number, number][], origin: Vec3, led: Led): void {
     const color = this.colors[zone];
     const shape = new THREE.Shape();
     outline.forEach(([x, y], i) => (i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y)));
@@ -48,20 +48,20 @@ export class SceneBuilder implements LedScene {
     const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
     mesh.position.set(origin[0], origin[1], origin[2]);
     this.groups[zone].add(mesh);
-    this.pushMesh(mat, color, led);
+    this.pushMesh(mat, color, led, zone, segment);
   }
 
-  cone(zone: ZoneId, led: Led): void {
+  cone(zone: ZoneId, segment: string, led: Led): void {
     const color = this.colors[zone];
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
     const cone = new THREE.Mesh(this.coneGeo, mat);
     cone.position.set(led.world[0], led.world[1], led.world[2]);
     this.groups[zone].add(cone);
-    this.pushMesh(mat, color, led);
+    this.pushMesh(mat, color, led, zone, segment);
   }
 
   // A Points cloud with per-vertex colors tracked for live/demo updates.
-  points(zone: ZoneId, leds: Led[], style: PointStyle): void {
+  points(zone: ZoneId, segment: string, leds: Led[], style: PointStyle): void {
     const n = leds.length;
     if (n === 0) return;
     const color = this.colors[zone];
@@ -98,6 +98,8 @@ export class SceneBuilder implements LedScene {
         yn: 0,
         zn: 0,
         twinkleOffset: 0,
+        zone,
+        segment,
       });
     }
 
@@ -124,7 +126,13 @@ export class SceneBuilder implements LedScene {
     );
   }
 
-  private pushMesh(material: THREE.MeshBasicMaterial, base: THREE.Color, led: Led): void {
+  private pushMesh(
+    material: THREE.MeshBasicMaterial,
+    base: THREE.Color,
+    led: Led,
+    zone: ZoneId,
+    segment: string,
+  ): void {
     this.targets.push({
       kind: 'mesh',
       material,
@@ -136,6 +144,8 @@ export class SceneBuilder implements LedScene {
       yn: 0,
       zn: 0,
       twinkleOffset: 0,
+      zone,
+      segment,
     });
   }
 }

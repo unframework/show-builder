@@ -1,7 +1,10 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
 import type { Vec3 } from '../scene/coords';
+import type { PixelDescriptor } from '../scene/normalize';
+import type { ZoneId } from '../scene/zones';
 
 export interface EffectInput {
+  index: number;
   xn: number;
   yn: number;
   zn: number;
@@ -10,8 +13,6 @@ export interface EffectInput {
   beat: number;
   bpm: number;
   twinkleOffset: number;
-  // Normalized position of the rose window: a focal point some effects warp around.
-  focus: Vec3;
 }
 
 // HSL for a pixel given its normalized position and the animation phase.
@@ -44,6 +45,12 @@ const beatSpike = (beat: number, bpm: number, decay: number) => {
   const sinceBeatSec = (beat - Math.floor(beat)) * (60 / bpm);
   return Math.exp(-sinceBeatSec / decay);
 };
+// Angular gap (radians) to the nearest arm of a two-armed axis through the origin:
+// folded into [0, π/2] so a direction and its opposite read identically.
+const axisGap = (a: number) => {
+  const m = ((a % Math.PI) + Math.PI) % Math.PI;
+  return Math.min(m, Math.PI - m);
+};
 
 const NOISE_SCALE = 6.5;
 const NOISE_TIME = 0.4;
@@ -67,6 +74,73 @@ const RAY_EXPAND = 0.2;
 // Horizontal detail multiplier at the floor, ramping to full (1) at the top:
 // compresses the sampled X-coord low down so the bottom reads coarser than the crown.
 const RAY_DETAIL_FLOOR = 0.05;
+
+// Concentric ripples radiating from the rose window.
+// Rings per unit distance from the focus.
+const RING_FREQ = 18;
+// Outward drift of the ring pattern per phase unit.
+const RING_SPEED = 0.8;
+// Extra outward shove injected on each kick, in ring widths.
+const RING_EXPAND = 0.3;
+// Distance at which rings fade to black, keeping the focus the bright origin.
+const RING_REACH = 1.5;
+const RING_SCALE_X = 0.95;
+const RING_SCALE_Y = 1;
+const RING_SCALE_Z = 0.05;
+// Searchlight: two opposite rays through the rose center, sweeping the facade
+// (X–Y) plane and blooming bright/white where they cross the rings.
+const SEARCH_SPEED = Math.PI; // axis rotation, radians per beat (π = one half-turn per beat)
+const SEARCH_WIDTH = 0.35; // angular half-width of each beam, radians
+const SEARCH_GAIN = 0.3; // lightness added at the beam core
+
+// Zones whose whole element lights as one solid ring; every other zone ripples
+// per-pixel. An arch samples the ring field at its pixel nearest the focus.
+const RING_SOLID_ZONES = new Set<ZoneId>(['mainArches']);
+// const RING_SOLID_ZONES = new Set<ZoneId>(['mainArches', 'miniArches', 'quadArches']);
+
+interface RingSample {
+  r: number;
+  fade: number;
+  // Direction from the focus in the facade X–Y plane, radians, for the searchlight.
+  angle: number;
+}
+
+// Per pixel, the anisotropic distance from the focus at which it reads the ring
+// field, plus its precomputed edge fade. Solid-zone pixels borrow the distance of
+// their segment's focus-nearest pixel so a whole arch resolves to one ring.
+function ringField(pixels: PixelDescriptor[], focus: Vec3): RingSample[] {
+  const [fx, fy, fz] = focus;
+
+  const nearestOfSegment = new Map<string, number>();
+  pixels.forEach((p, i) => {
+    if (!RING_SOLID_ZONES.has(p.zone)) return;
+    const d2 = (p.xn - fx) ** 2 + (p.yn - fy) ** 2 + (p.zn - fz) ** 2;
+    const best = nearestOfSegment.get(p.segment);
+    if (best === undefined) {
+      nearestOfSegment.set(p.segment, i);
+      return;
+    }
+    const b = pixels[best];
+    if (d2 < (b.xn - fx) ** 2 + (b.yn - fy) ** 2 + (b.zn - fz) ** 2) {
+      nearestOfSegment.set(p.segment, i);
+    }
+  });
+
+  const ro = 0.5;
+  const rk = 8;
+  return pixels.map((p) => {
+    const src = RING_SOLID_ZONES.has(p.zone) ? pixels[nearestOfSegment.get(p.segment)!] : p;
+    const dx = (src.xn - fx) * RING_SCALE_X;
+    const dy = (src.yn - fy) * RING_SCALE_Y;
+    const dz = (src.zn - fz) * RING_SCALE_Z;
+    const r = (Math.sqrt(Math.hypot(dx, dy, dz) * rk + ro) - Math.sqrt(ro)) / rk;
+    return {
+      r,
+      fade: 1 - smoothstep(0, RING_REACH, r),
+      angle: Math.atan2(p.yn - fy, (p.xn - fx) * 0.3),
+    };
+  });
+}
 
 // Warp a normalized position around `focus` so noise sampled at the result stays
 // fine-grained near the focus and stretches (coarsens) with distance in every
@@ -99,13 +173,18 @@ export const DEMO_EFFECTS = [
   { id: 'twinkle', label: 'twinkle' },
   { id: 'noise', label: 'noise blobs' },
   { id: 'noise-rays', label: 'noise rays' },
+  { id: 'rings', label: 'rose rings' },
 ] as const;
 
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
 
-export function createDemoEffects({
-  noise4D,
-}: DemoEffectContext): Record<DemoEffectId, DemoEffect['hsl'] | undefined> {
+export function createDemoEffects(
+  { noise4D }: DemoEffectContext,
+  pixels: PixelDescriptor[],
+  focus: Vec3,
+): Record<DemoEffectId, DemoEffect['hsl'] | undefined> {
+  const [fx, fy, fz] = focus;
+  const rings = ringField(pixels, focus);
   return {
     zone: undefined,
     'lr-sweep': ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))],
@@ -123,7 +202,7 @@ export function createDemoEffects({
         0.02 + 0.55 * b,
       ];
     },
-    noise: ({ xn, yn, zn, phase, beat, bpm, focus }) => {
+    noise: ({ xn, yn, zn, phase, beat, bpm }) => {
       const kick = beatSpike(beat, bpm, PULSE_DECAY);
       const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1 - PULSE_EXPAND * kick);
       const v = noise4D(sx, sy, sz, phase * NOISE_TIME);
@@ -135,8 +214,7 @@ export function createDemoEffects({
       const yoff = (1 - yn) * (1 - yn);
       return [-0.2 + 0.25 * amt - yoff * 0.2, 1, (0.5 + 0.1 * kick) * amt];
     },
-    'noise-rays': ({ xn, yn, zn, phase, beat, bpm, focus }) => {
-      const [fx, fy, fz] = focus;
+    'noise-rays': ({ xn, yn, zn, phase, beat, bpm }) => {
       const dx = Math.abs(xn - fx);
       const dy = yn - fy;
       const dz = (zn - fz) * RAY_NOISE_DEPTH;
@@ -160,6 +238,19 @@ export function createDemoEffects({
         Math.sin(phase * 0.5) * 0.2 + -0.2 + 0.25 * amt - yoff * 0.2,
         1,
         (0.5 + 0.3 * kick) * amt,
+      ];
+    },
+    rings: ({ index, phase, beat, bpm }) => {
+      const { r, fade, angle } = rings[index];
+      const kick = beatSpike(beat, bpm, PULSE_DECAY);
+      const crest = bell(wrap(r * RING_FREQ - phase * RING_SPEED - kick * RING_EXPAND));
+
+      const beam = 1 - smoothstep(0, SEARCH_WIDTH, axisGap(angle - (beat - 0.55) * SEARCH_SPEED));
+
+      return [
+        0.37 + 0.09 * crest + 0.08 * Math.sin(phase * 0.3) + 0.1 * beam,
+        0.9 - 0.2 * beam,
+        (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
       ];
     },
   };

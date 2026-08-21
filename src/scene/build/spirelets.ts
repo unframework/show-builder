@@ -11,7 +11,7 @@ const BACK_SPIRE_BASE_Y = 8.342;
 const FRONT_TOWER_BASE_Y = 8.018;
 
 export function buildSpirelets(scene: LedScene, data: Spirelets): void {
-  for (const pixel of data.pixels) {
+  data.pixels.forEach((pixel, i) => {
     const [catX, catY, catZ] = pixel.position;
     const baseY = pixel.corner.startsWith('back')
       ? BACK_SPIRE_BASE_Y
@@ -19,10 +19,10 @@ export function buildSpirelets(scene: LedScene, data: Spirelets): void {
         ? FRONT_SPIRE_BASE_Y
         : FRONT_TOWER_BASE_Y;
     const world: Vec3 = [-catZ, baseY + SPIRELET_HEIGHT / 2, catX];
-    scene.cone('spirelets', {
+    scene.cone('spirelets', `spirelet:${i}`, {
       universe: pixel.universe,
       ch0: pixel.universe_start_channel - 1,
       world,
     });
-  }
+  });
 }
