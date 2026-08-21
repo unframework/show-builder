@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { EffectControls } from './components/EffectControls';
+import { RunToggle } from './components/RunToggle';
 import { Sidenav } from './components/Sidenav';
 import { Toolbar } from './components/Toolbar';
 import { XmlModal } from './components/XmlModal';
@@ -45,6 +46,7 @@ export function App() {
       <div className="shrink-0 flex flex-col px-2 py-3 gap-4 border-t border-base-300 bg-base-200">
         <div className="flex flex-wrap gap-8 items-center">
           <h3 className="text-xs uppercase tracking-wide opacity-50 sm:px-4">Effects</h3>
+          {engine && <RunToggle source={effectSource} size="sm" />}
           {error ? (
             <span className="text-error">Error: {error}</span>
           ) : (

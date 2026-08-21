@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { EffectControls } from '../components/EffectControls';
+import { RunToggle } from '../components/RunToggle';
 import { OutputControls } from './OutputControls';
 import { createWsControl, type WsControl } from './wsControl';
 
@@ -26,6 +27,7 @@ export function RunnerApp() {
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 border-b border-base-100">
         <h1 className="text-sm font-semibold uppercase tracking-wide">The Gothic Folly</h1>
         <div className="flex flex-wrap items-center gap-4">
+          {control && <RunToggle source={control} size="sm" />}
           {control && <OutputControls source={control} />}
           <span className={clsx('badge badge-sm', connected ? 'badge-success' : 'badge-error')}>
             {connected ? '● CONNECTED' : '○ OFFLINE'}
