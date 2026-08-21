@@ -13,6 +13,9 @@ Environment=RUNNER_PORT=3002
 ExecStart=/usr/bin/node /opt/gothic-folly-runner/start.mjs
 Restart=on-failure
 RestartSec=3
+# For true isolation, keep TouchKio off core 3 (AllowedCPUs=0-2 on its unit).
+Nice=-10
+AllowedCPUs=3
 
 [Install]
 WantedBy=multi-user.target
