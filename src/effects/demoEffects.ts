@@ -93,6 +93,47 @@ const SEARCH_SPEED = Math.PI; // axis rotation, radians per beat (π = one half-
 const SEARCH_WIDTH = 0.35; // angular half-width of each beam, radians
 const SEARCH_GAIN = 0.3; // lightness added at the beam core
 
+// ---- rising bubbles (procedural / cellular) --------------------------------
+// The XZ plane is a grid of columns; each column procedurally emits bubbles that
+// rise from the floor (yn 0) to the surface (yn 1). Every bubble is derived from
+// its (cell, temporalIndex) via a hash — no stored state. The XZ hit is discrete
+// (a pixel's own cell); only the vertical edge is soft.
+const BUBBLE_GRID_X = 80;
+const BUBBLE_GRID_Z = 80;
+// Bubble cycles per phase unit. rise time = DUTY / rate phase units.
+const BUBBLE_RATE = 0.15;
+// ± fraction of per-column rate jitter (varies each column's speed/frequency).
+const BUBBLE_RATE_JITTER = 0.35;
+// Fraction of a column's cycle the bubble is travelling; the rest is a quiet gap.
+const BUBBLE_DUTY = 0.7;
+// Vertical half-thickness (normalized) range: the soft edge along the rise.
+const BUBBLE_THICKNESS_MIN = 0.02;
+const BUBBLE_THICKNESS_MAX = 0.03;
+// ± fraction applied per bubble to its brightness.
+const BUBBLE_GAIN_JITTER = 0.2;
+// Per-bubble hue offset around the blue base, hue units.
+const BUBBLE_TINT = 0.06;
+// Fade a bubble in off the floor and out as it nears the top.
+const BUBBLE_FLOOR_FADE = 0.08;
+const BUBBLE_SURFACE = 0.9;
+// Distinct salts so independent hash channels don't correlate.
+const BUBBLE_SALT_OFFSET = 7919;
+const BUBBLE_SALT_RATE = 6857;
+// Faint-blue vertical background gradient + near-white bubble core.
+const BG_HUE = 0.6;
+const BG_SAT = 0.7;
+const BG_MAX = 0.05; // peak faint-blue lightness at the crown
+const BUBBLE_L = 0.85;
+
+// Stateless integer hash → [0,1), decorrelated between neighboring cells.
+const hashU = (a: number, b: number, c: number) => {
+  let h =
+    Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1) ^ Math.imul(c | 0, 0x9e3779b1);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
+
 // Zones whose whole element lights as one solid ring; every other zone ripples
 // per-pixel. An arch samples the ring field at its pixel nearest the focus.
 const RING_SOLID_ZONES = new Set<ZoneId>(['mainArches']);
@@ -174,6 +215,7 @@ export const DEMO_EFFECTS = [
   { id: 'noise', label: 'noise blobs' },
   { id: 'noise-rays', label: 'noise rays' },
   { id: 'rings', label: 'rose rings' },
+  { id: 'rising-bubbles', label: 'rising bubbles' },
 ] as const;
 
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
@@ -252,6 +294,31 @@ export function createDemoEffects(
         0.9 - 0.2 * beam,
         (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
       ];
+    },
+    'rising-bubbles': ({ xn, yn, zn, phase }) => {
+      const ix = Math.floor(xn * BUBBLE_GRID_X);
+      const iz = Math.floor(zn * BUBBLE_GRID_Z);
+      let c = 0;
+      let tint = 0;
+      const rate =
+        BUBBLE_RATE *
+        (1 - BUBBLE_RATE_JITTER + 2 * BUBBLE_RATE_JITTER * hashU(ix, iz, BUBBLE_SALT_RATE));
+      const tc = phase * rate + hashU(ix, iz, BUBBLE_SALT_OFFSET);
+      const life = tc - Math.floor(tc);
+      if (life < BUBBLE_DUTY) {
+        const k = Math.floor(tc);
+        const u = life / BUBBLE_DUTY;
+        const thickness =
+          BUBBLE_THICKNESS_MIN +
+          (BUBBLE_THICKNESS_MAX - BUBBLE_THICKNESS_MIN) * hashU(ix, iz, k + 2027);
+        const gain = 1 - BUBBLE_GAIN_JITTER + 2 * BUBBLE_GAIN_JITTER * hashU(ix, iz, k + 4049);
+        const fade = smoothstep(0, BUBBLE_FLOOR_FADE, u) * (1 - smoothstep(BUBBLE_SURFACE, 1, u));
+        const dy = (yn - u) / thickness;
+        c = Math.min(1, Math.exp(-dy * dy) * fade * gain);
+        tint = (hashU(ix, iz, k + 3037) - 0.5) * BUBBLE_TINT;
+      }
+      const bgL = BG_MAX * yn * yn;
+      return [BG_HUE + tint * c, BG_SAT * (1 - c), bgL * (1 - c) + BUBBLE_L * c];
     },
   };
 }
