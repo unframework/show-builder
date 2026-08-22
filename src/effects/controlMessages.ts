@@ -9,6 +9,7 @@ export const demoEffectId = z.enum(
 export const controlCommand = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set-effect'), id: demoEffectId }),
   z.object({ type: z.literal('set-speed'), speed: z.number() }),
+  z.object({ type: z.literal('set-brightness'), brightness: z.number() }),
   z.object({ type: z.literal('set-bpm'), bpm: z.number() }),
   z.object({ type: z.literal('set-running'), running: z.boolean() }),
   z.object({ type: z.literal('set-output'), host: z.string(), port: z.number().int().positive() }),
@@ -23,6 +24,7 @@ export const controlState = z.object({
   effect: demoEffectId,
   running: z.boolean(),
   speed: z.number(),
+  brightness: z.number(),
   bpm: z.number(),
 });
 export type ControlState = z.infer<typeof controlState>;
@@ -36,6 +38,7 @@ export const effectResumeState = z.object({
   effect: demoEffectId,
   running: z.boolean(),
   speed: z.number(),
+  brightness: z.number(),
   bpm: z.number().positive(),
   phase: z.number(),
   beat: z.number(),

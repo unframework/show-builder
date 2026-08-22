@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrightnessControl } from './components/BrightnessControl';
 import { EffectControls } from './components/EffectControls';
 import { RunToggle } from './components/RunToggle';
 import { Sidenav } from './components/Sidenav';
@@ -47,6 +48,7 @@ export function App() {
         <div className="flex flex-wrap gap-8 items-center">
           <h3 className="text-xs uppercase tracking-wide opacity-50 sm:px-4">Effects</h3>
           {engine && <RunToggle source={effectSource} size="sm" />}
+          {engine && <BrightnessControl source={effectSource} size="sm" />}
           {error ? (
             <span className="text-error">Error: {error}</span>
           ) : (

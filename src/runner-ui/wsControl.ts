@@ -44,6 +44,7 @@ export function createWsControl(url: string, handlers: WsControlHandlers): WsCon
   return {
     setEffect: (id) => send({ type: 'set-effect', id }),
     setSpeed: (speed) => send({ type: 'set-speed', speed }),
+    setBrightness: (brightness) => send({ type: 'set-brightness', brightness }),
     setBpm: (bpm) => send({ type: 'set-bpm', bpm }),
     setRunning: (running) => send({ type: 'set-running', running }),
     setOutput: (host, port) => send({ type: 'set-output', host, port }),

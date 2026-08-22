@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
+import { BrightnessControl } from '../components/BrightnessControl';
 import { EffectControls } from '../components/EffectControls';
 import { RunToggle } from '../components/RunToggle';
 import { OutputControls } from './OutputControls';
@@ -28,6 +29,7 @@ export function RunnerApp() {
         <h1 className="text-sm font-semibold uppercase tracking-wide">The Gothic Folly</h1>
         <div className="flex flex-wrap items-center gap-4">
           {control && <RunToggle source={control} size="sm" />}
+          {control && <BrightnessControl source={control} size="sm" />}
           {control && <OutputControls source={control} />}
           <span className={clsx('badge badge-sm', connected ? 'badge-success' : 'badge-error')}>
             {connected ? '● CONNECTED' : '○ OFFLINE'}

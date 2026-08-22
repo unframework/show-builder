@@ -48,6 +48,7 @@ export class EffectSource {
   private effectId: DemoEffectId = 'zone';
   private running = true;
   private speed = 1;
+  private brightness = 1;
   private phase = 0;
   private bpm = 120;
   private beat = 0;
@@ -81,6 +82,7 @@ export class EffectSource {
       effect: this.effectId,
       running: this.running,
       speed: this.speed,
+      brightness: this.brightness,
       bpm: this.bpm,
     };
   }
@@ -91,6 +93,7 @@ export class EffectSource {
         effect: this.effectId,
         running: this.running,
         speed: this.speed,
+        brightness: this.brightness,
         bpm: this.bpm,
         phase: this.phase,
         beat: this.beat + this.beatNudge,
@@ -108,6 +111,7 @@ export class EffectSource {
     this.hsl = this.hslById[state.effect];
     this.running = state.running;
     this.speed = state.speed;
+    this.brightness = state.brightness;
     this.bpm = state.bpm;
     this.phase = state.phase;
     this.beat = state.beat;
@@ -137,6 +141,13 @@ export class EffectSource {
     if (speed === this.speed) return;
 
     this.speed = speed;
+    this.notify(this.getState());
+  }
+
+  setBrightness(brightness: number): void {
+    if (brightness === this.brightness) return;
+
+    this.brightness = brightness;
     this.notify(this.getState());
   }
 
@@ -174,13 +185,14 @@ export class EffectSource {
     this.phase += dt * this.speed;
 
     const hsl = this.hsl;
+    const brightness = this.brightness;
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const bytes = this.buffers.get(p.universe)!;
       if (!hsl) {
-        bytes[p.ch0] = clampByte(p.base[0]);
-        bytes[p.ch0 + 1] = clampByte(p.base[1]);
-        bytes[p.ch0 + 2] = clampByte(p.base[2]);
+        bytes[p.ch0] = clampByte(p.base[0] * brightness);
+        bytes[p.ch0 + 1] = clampByte(p.base[1] * brightness);
+        bytes[p.ch0 + 2] = clampByte(p.base[2] * brightness);
         continue;
       }
       const [h, s, l] = hsl({
@@ -194,9 +206,9 @@ export class EffectSource {
         twinkleOffset: p.twinkleOffset,
       });
       const [r, g, b] = hslToRgb(h, s, l);
-      bytes[p.ch0] = clampByte(r);
-      bytes[p.ch0 + 1] = clampByte(g);
-      bytes[p.ch0 + 2] = clampByte(b);
+      bytes[p.ch0] = clampByte(r * brightness);
+      bytes[p.ch0 + 1] = clampByte(g * brightness);
+      bytes[p.ch0 + 2] = clampByte(b * brightness);
     }
 
     for (const [universe, bytes] of this.buffers) this.emit(universe, bytes);

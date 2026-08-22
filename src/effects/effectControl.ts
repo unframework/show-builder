@@ -7,6 +7,7 @@ import type { DemoEffectId } from './demoEffects';
 export interface EffectControl {
   setEffect(id: DemoEffectId): Promise<void>;
   setSpeed(speed: number): Promise<void>;
+  setBrightness(brightness: number): Promise<void>;
   setBpm(bpm: number): Promise<void>;
   // Halt phase advance and emission; the beat clock keeps running
   setRunning(running: boolean): Promise<void>;

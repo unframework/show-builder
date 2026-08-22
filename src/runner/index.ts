@@ -112,13 +112,14 @@ async function main(): Promise<void> {
   const source = new EffectSource(pixels, focus, output.emit);
   if (saved.effect) source.setEffect(saved.effect);
   if (saved.speed !== undefined) source.setSpeed(saved.speed);
+  if (saved.brightness !== undefined) source.setBrightness(saved.brightness);
   if (saved.bpm !== undefined) source.setBpm(saved.bpm);
   if (saved.running !== undefined) source.setRunning(saved.running);
 
   const persist = (): void => {
     const { host, port } = output.destination;
-    const { effect, running, speed, bpm } = source.getState();
-    saver.save({ sacnHost: host, sacnPort: port, effect, running, speed, bpm });
+    const { effect, running, speed, brightness, bpm } = source.getState();
+    saver.save({ sacnHost: host, sacnPort: port, effect, running, speed, brightness, bpm });
   };
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {

@@ -77,6 +77,9 @@ export function startControlServer({
         case 'set-speed':
           source.setSpeed(cmd.speed);
           break;
+        case 'set-brightness':
+          source.setBrightness(cmd.brightness);
+          break;
         case 'set-bpm':
           source.setBpm(cmd.bpm);
           break;

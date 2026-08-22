@@ -16,6 +16,7 @@ export const runnerSettings = z
     effect: demoEffectId,
     running: z.boolean(),
     speed: z.number(),
+    brightness: z.number(),
     bpm: z.number(),
   })
   .partial();
