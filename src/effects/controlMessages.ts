@@ -29,6 +29,9 @@ export const controlState = z.object({
 });
 export type ControlState = z.infer<typeof controlState>;
 
+export const effectSettings = controlState.omit({ type: true }).partial();
+export type EffectSettings = z.infer<typeof effectSettings>;
+
 export const controlBeat = z.object({ type: z.literal('beat'), beat: z.number() });
 export type ControlBeat = z.infer<typeof controlBeat>;
 

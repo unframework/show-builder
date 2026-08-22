@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EffectSource } from '../effects/EffectSource';
+import { applyEffectSettings, EffectSource } from '../effects/EffectSource';
 import { SacnOutput } from '../relay/e131';
 import { ROSE_CENTER_WORLD } from '../scene/build/roseWindow';
 import type { Vec3 } from '../scene/coords';
@@ -110,11 +110,7 @@ async function main(): Promise<void> {
 
   const output = new SacnOutput(saved.sacnHost ?? SACN_HOST, saved.sacnPort ?? SACN_PORT);
   const source = new EffectSource(pixels, focus, output.emit);
-  if (saved.effect) source.setEffect(saved.effect);
-  if (saved.speed !== undefined) source.setSpeed(saved.speed);
-  if (saved.brightness !== undefined) source.setBrightness(saved.brightness);
-  if (saved.bpm !== undefined) source.setBpm(saved.bpm);
-  if (saved.running !== undefined) source.setRunning(saved.running);
+  applyEffectSettings(source, saved);
 
   const persist = (): void => {
     const { host, port } = output.destination;

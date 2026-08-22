@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EffectEvent } from './effects/controlMessages';
 import type { CathedralEngine } from './engine/CathedralEngine';
-import { EffectSource, type ResumeState } from './effects/EffectSource';
+import { applyEffectSettings, EffectSource, type ResumeState } from './effects/EffectSource';
 import type { EffectControl } from './effects/effectControl';
+import { loadEffectSettings, saveEffectSettings } from './effectStorage';
 
 // Rebound when the engine module hot-swaps so `new ActiveEffectSource()` picks
 // up the new code (the static import binding is not rebound by hot.accept).
@@ -44,9 +45,13 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
       resume,
     );
     const unsubscribe = source.subscribe((event) => {
+      if (event.type === 'state') saveEffectSettings(event);
       for (const listener of listenersRef.current) listener(event);
     });
     sourceRef.current = source;
+    // A hot-reload resume already carries the live knobs (plus the animation
+    // clock); only a cold mount needs to replay the persisted ones.
+    if (!resume) applyEffectSettings(source, loadEffectSettings());
     return () => {
       if (import.meta.hot) resumeRef.current = source.getResumeState();
       unsubscribe();

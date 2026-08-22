@@ -6,6 +6,7 @@ import {
   type ControlState,
   type EffectEvent,
   type EffectResumeState,
+  type EffectSettings,
 } from './controlMessages';
 import {
   createDemoEffectContext,
@@ -17,6 +18,16 @@ import {
 
 type Emit = (universe: number, bytes: Uint8Array) => void;
 type Listener = (event: EffectEvent) => void;
+
+// Seed a live source from persisted knobs; running is applied last so its
+// early-return can't be shadowed by an intermediate state.
+export function applyEffectSettings(source: EffectSource, settings: EffectSettings): void {
+  if (settings.effect) source.setEffect(settings.effect);
+  if (settings.speed !== undefined) source.setSpeed(settings.speed);
+  if (settings.brightness !== undefined) source.setBrightness(settings.brightness);
+  if (settings.bpm !== undefined) source.setBpm(settings.bpm);
+  if (settings.running !== undefined) source.setRunning(settings.running);
+}
 
 const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
 

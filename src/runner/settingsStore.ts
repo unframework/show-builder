@@ -1,25 +1,18 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { demoEffectId } from '../effects/controlMessages';
+import { effectSettings } from '../effects/controlMessages';
 
 const FILE = 'settings.json';
 const SAVE_DEBOUNCE_MS = 750;
 
 // The subset of runner state that survives a restart: the sACN destination plus
-// the live knobs (`EffectSource.getState()` minus its `type` tag). Every field is
-// optional so a partial or older file still loads.
-export const runnerSettings = z
-  .object({
-    sacnHost: z.string(),
-    sacnPort: z.number().int().positive(),
-    effect: demoEffectId,
-    running: z.boolean(),
-    speed: z.number(),
-    brightness: z.number(),
-    bpm: z.number(),
-  })
-  .partial();
+// the persisted effect knobs. Every field is optional so a partial or older file
+// still loads.
+export const runnerSettings = effectSettings.extend({
+  sacnHost: z.string().optional(),
+  sacnPort: z.number().int().positive().optional(),
+});
 export type RunnerSettings = z.infer<typeof runnerSettings>;
 
 export interface SettingsSaver {

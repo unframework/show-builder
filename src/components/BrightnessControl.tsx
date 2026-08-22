@@ -65,7 +65,7 @@ export function BrightnessControl({
         </>
       ) : (
         <button
-          className="w-10 text-right font-mono text-xs tabular-nums"
+          className="input input-sm w-16 font-mono text-xs tabular-nums cursor-pointer"
           onClick={percentField.edit}
         >
           {percent}%
