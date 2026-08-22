@@ -79,9 +79,9 @@ const RAY_DETAIL_FLOOR = 0.05;
 // Rings per unit distance from the focus.
 const RING_FREQ = 18;
 // Outward drift of the ring pattern per phase unit.
-const RING_SPEED = 0.8;
+const RING_SPEED = 1.8;
 // Extra outward shove injected on each kick, in ring widths.
-const RING_EXPAND = 0.3;
+const RING_EXPAND = 0.4;
 // Distance at which rings fade to black, keeping the focus the bright origin.
 const RING_REACH = 1.5;
 const RING_SCALE_X = 0.95;
