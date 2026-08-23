@@ -1,0 +1,393 @@
+{
+ "note": "Wash floods, all four towers (#99/#102): positions from reference/washes.obj (authoritative mount plan). 12 V WS2811 floods, 1 px each; data from the SR, V+ from the 12 V flood rail. FRONT chains start at the inner-front corner (closest to the rose window) with the stacked UP flood first, then DOWN, then wrap the outside of the tower (FL clockwise, FR counter-clockwise). BACK chains run front-face first, then clockwise (F-L-B-R).",
+ "total_pixels": 22,
+ "total_channels": 66,
+ "chains": [
+  {
+   "chain": "WASH-FR",
+   "tower": "front-right",
+   "connector": "8E",
+   "universe": 55,
+   "universe_start_channel": 379,
+   "n_pixels": 7
+  },
+  {
+   "chain": "WASH-FL",
+   "tower": "front-left",
+   "connector": "12E",
+   "universe": 61,
+   "universe_start_channel": 121,
+   "n_pixels": 7
+  },
+  {
+   "chain": "WASH-BL",
+   "tower": "back-left",
+   "connector": "16A",
+   "universe": 67,
+   "universe_start_channel": 1,
+   "n_pixels": 4
+  },
+  {
+   "chain": "WASH-BR",
+   "tower": "back-right",
+   "connector": "20A",
+   "universe": 74,
+   "universe_start_channel": 1,
+   "n_pixels": 4
+  }
+ ],
+ "pixels": [
+  {
+   "pixel_index": 0,
+   "label": "WASH-FR-1",
+   "chain": "WASH-FR",
+   "chain_index": 0,
+   "face": "inner-front",
+   "desc": "inner-front corner UP flood",
+   "aim": "up",
+   "universe": 55,
+   "universe_start_channel": 379,
+   "position": [
+    -11.1037,
+    8.021,
+    4.4299
+   ]
+  },
+  {
+   "pixel_index": 1,
+   "label": "WASH-FR-2",
+   "chain": "WASH-FR",
+   "chain_index": 1,
+   "face": "inner-front",
+   "desc": "inner-front corner DOWN flood",
+   "aim": "down",
+   "universe": 55,
+   "universe_start_channel": 382,
+   "position": [
+    -11.1037,
+    7.9027,
+    4.4299
+   ]
+  },
+  {
+   "pixel_index": 2,
+   "label": "WASH-FR-3",
+   "chain": "WASH-FR",
+   "chain_index": 2,
+   "face": "front",
+   "desc": "front-face flood",
+   "aim": "down",
+   "universe": 55,
+   "universe_start_channel": 385,
+   "position": [
+    -11.1037,
+    7.9027,
+    6.8499
+   ]
+  },
+  {
+   "pixel_index": 3,
+   "label": "WASH-FR-4",
+   "chain": "WASH-FR",
+   "chain_index": 3,
+   "face": "right",
+   "desc": "right-face front flood",
+   "aim": "down",
+   "universe": 55,
+   "universe_start_channel": 388,
+   "position": [
+    -9.9235,
+    7.9027,
+    8.1945
+   ]
+  },
+  {
+   "pixel_index": 4,
+   "label": "WASH-FR-5",
+   "chain": "WASH-FR",
+   "chain_index": 4,
+   "face": "right",
+   "desc": "right-face rear flood",
+   "aim": "down",
+   "universe": 55,
+   "universe_start_channel": 391,
+   "position": [
+    -7.5035,
+    7.9027,
+    8.1945
+   ]
+  },
+  {
+   "pixel_index": 5,
+   "label": "WASH-FR-6",
+   "chain": "WASH-FR",
+   "chain_index": 5,
+   "face": "back",
+   "desc": "back-face outer flood",
+   "aim": "down",
+   "universe": 55,
+   "universe_start_channel": 394,
+   "position": [
+    -6.1989,
+    7.9027,
+    6.8499
+   ]
+  },
+  {
+   "pixel_index": 6,
+   "label": "WASH-FR-7",
+   "chain": "WASH-FR",
+   "chain_index": 6,
+   "face": "back",
+   "desc": "back-face inner flood",
+   "aim": "down",
+   "universe": 55,
+   "universe_start_channel": 397,
+   "position": [
+    -6.1989,
+    7.9027,
+    4.4299
+   ]
+  },
+  {
+   "pixel_index": 7,
+   "label": "WASH-FL-1",
+   "chain": "WASH-FL",
+   "chain_index": 0,
+   "face": "inner-front",
+   "desc": "inner-front corner UP flood",
+   "aim": "up",
+   "universe": 61,
+   "universe_start_channel": 121,
+   "position": [
+    -11.1037,
+    8.021,
+    -5.1277
+   ]
+  },
+  {
+   "pixel_index": 8,
+   "label": "WASH-FL-2",
+   "chain": "WASH-FL",
+   "chain_index": 1,
+   "face": "inner-front",
+   "desc": "inner-front corner DOWN flood",
+   "aim": "down",
+   "universe": 61,
+   "universe_start_channel": 124,
+   "position": [
+    -11.1037,
+    7.9027,
+    -5.1277
+   ]
+  },
+  {
+   "pixel_index": 9,
+   "label": "WASH-FL-3",
+   "chain": "WASH-FL",
+   "chain_index": 2,
+   "face": "front",
+   "desc": "front-face flood",
+   "aim": "down",
+   "universe": 61,
+   "universe_start_channel": 127,
+   "position": [
+    -11.1037,
+    7.9027,
+    -7.5477
+   ]
+  },
+  {
+   "pixel_index": 10,
+   "label": "WASH-FL-4",
+   "chain": "WASH-FL",
+   "chain_index": 3,
+   "face": "left",
+   "desc": "left-face front flood",
+   "aim": "down",
+   "universe": 61,
+   "universe_start_channel": 130,
+   "position": [
+    -9.9235,
+    7.9027,
+    -8.8923
+   ]
+  },
+  {
+   "pixel_index": 11,
+   "label": "WASH-FL-5",
+   "chain": "WASH-FL",
+   "chain_index": 4,
+   "face": "left",
+   "desc": "left-face rear flood",
+   "aim": "down",
+   "universe": 61,
+   "universe_start_channel": 133,
+   "position": [
+    -7.5035,
+    7.9027,
+    -8.8923
+   ]
+  },
+  {
+   "pixel_index": 12,
+   "label": "WASH-FL-6",
+   "chain": "WASH-FL",
+   "chain_index": 5,
+   "face": "back",
+   "desc": "back-face outer flood",
+   "aim": "down",
+   "universe": 61,
+   "universe_start_channel": 136,
+   "position": [
+    -6.1989,
+    7.9027,
+    -7.5477
+   ]
+  },
+  {
+   "pixel_index": 13,
+   "label": "WASH-FL-7",
+   "chain": "WASH-FL",
+   "chain_index": 6,
+   "face": "back",
+   "desc": "back-face inner flood",
+   "aim": "down",
+   "universe": 61,
+   "universe_start_channel": 139,
+   "position": [
+    -6.1989,
+    7.9027,
+    -5.1277
+   ]
+  },
+  {
+   "pixel_index": 14,
+   "label": "WASH-BL-1",
+   "chain": "WASH-BL",
+   "chain_index": 0,
+   "face": "front",
+   "desc": "front-face flood",
+   "aim": "down",
+   "universe": 67,
+   "universe_start_channel": 1,
+   "position": [
+    11.8062,
+    5.8594,
+    -7.6391
+   ]
+  },
+  {
+   "pixel_index": 15,
+   "label": "WASH-BL-2",
+   "chain": "WASH-BL",
+   "chain_index": 1,
+   "face": "left",
+   "desc": "left-face flood",
+   "aim": "down",
+   "universe": 67,
+   "universe_start_channel": 4,
+   "position": [
+    12.9939,
+    5.8594,
+    -8.8268
+   ]
+  },
+  {
+   "pixel_index": 16,
+   "label": "WASH-BL-3",
+   "chain": "WASH-BL",
+   "chain_index": 2,
+   "face": "back",
+   "desc": "back-face flood",
+   "aim": "down",
+   "universe": 67,
+   "universe_start_channel": 7,
+   "position": [
+    14.1815,
+    5.8594,
+    -7.6391
+   ]
+  },
+  {
+   "pixel_index": 17,
+   "label": "WASH-BL-4",
+   "chain": "WASH-BL",
+   "chain_index": 3,
+   "face": "right",
+   "desc": "right-face flood",
+   "aim": "down",
+   "universe": 67,
+   "universe_start_channel": 10,
+   "position": [
+    12.9939,
+    5.8594,
+    -6.4514
+   ]
+  },
+  {
+   "pixel_index": 18,
+   "label": "WASH-BR-1",
+   "chain": "WASH-BR",
+   "chain_index": 0,
+   "face": "front",
+   "desc": "front-face flood",
+   "aim": "down",
+   "universe": 74,
+   "universe_start_channel": 1,
+   "position": [
+    11.8062,
+    5.8594,
+    6.9413
+   ]
+  },
+  {
+   "pixel_index": 19,
+   "label": "WASH-BR-2",
+   "chain": "WASH-BR",
+   "chain_index": 1,
+   "face": "left",
+   "desc": "left-face flood",
+   "aim": "down",
+   "universe": 74,
+   "universe_start_channel": 4,
+   "position": [
+    12.9939,
+    5.8594,
+    5.7536
+   ]
+  },
+  {
+   "pixel_index": 20,
+   "label": "WASH-BR-3",
+   "chain": "WASH-BR",
+   "chain_index": 2,
+   "face": "back",
+   "desc": "back-face flood",
+   "aim": "down",
+   "universe": 74,
+   "universe_start_channel": 7,
+   "position": [
+    14.1815,
+    5.8594,
+    6.9413
+   ]
+  },
+  {
+   "pixel_index": 21,
+   "label": "WASH-BR-4",
+   "chain": "WASH-BR",
+   "chain_index": 3,
+   "face": "right",
+   "desc": "right-face flood",
+   "aim": "down",
+   "universe": 74,
+   "universe_start_channel": 10,
+   "position": [
+    12.9939,
+    5.8594,
+    8.129
+   ]
+  }
+ ]
+}
