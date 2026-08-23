@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import type { Vec3 } from '../scene/coords';
-import type { Led, LedScene, PointStyle } from '../scene/ledScene';
+import type { Aim, Led, LedScene, PointStyle } from '../scene/ledScene';
 import type { LedTarget } from './targets';
 import { SPIRELET_HEIGHT, SPIRELET_RADIUS } from '../scene/build/spirelets';
+import { FLOOD_BEAM_HEIGHT, FLOOD_BEAM_RADIUS, FLOOD_FIXTURE_RADIUS } from '../scene/build/wash';
 import { ZONE_DEFS, type ZoneId } from '../scene/zones';
 
 function circleTexture(): THREE.Texture {
@@ -24,6 +25,14 @@ export class SceneBuilder implements LedScene {
   private readonly colors: Record<ZoneId, THREE.Color>;
   private readonly circle = circleTexture();
   private readonly coneGeo = new THREE.ConeGeometry(SPIRELET_RADIUS, SPIRELET_HEIGHT, 3, 1);
+  private readonly floodFixtureGeo = new THREE.SphereGeometry(FLOOD_FIXTURE_RADIUS, 10, 8);
+  private readonly floodBeamGeo = new THREE.ConeGeometry(
+    FLOOD_BEAM_RADIUS,
+    FLOOD_BEAM_HEIGHT,
+    12,
+    1,
+    true,
+  );
 
   constructor() {
     this.groups = {} as Record<ZoneId, THREE.Group>;
@@ -58,6 +67,34 @@ export class SceneBuilder implements LedScene {
     cone.position.set(led.world[0], led.world[1], led.world[2]);
     this.groups[zone].add(cone);
     this.pushMesh(mat, color, led, zone, segment);
+  }
+
+  // Fixture body plus a translucent beam glyph. Both share the flood's channel, so
+  // two mesh targets on one address paint together. ConeGeometry's apex points +Y
+  // (beam aimed down); the up-aimed flood flips it and stacks the beam above.
+  flood(zone: ZoneId, segment: string, led: Led, aim: Aim): void {
+    const color = this.colors[zone];
+    const [x, y, z] = led.world;
+
+    const fixtureMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 });
+    const fixture = new THREE.Mesh(this.floodFixtureGeo, fixtureMat);
+    fixture.position.set(x, y, z);
+    this.groups[zone].add(fixture);
+    this.pushMesh(fixtureMat, color, led, zone, segment);
+
+    const beamMat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.18,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const beam = new THREE.Mesh(this.floodBeamGeo, beamMat);
+    const up = aim === 'up';
+    beam.rotation.x = up ? Math.PI : 0;
+    beam.position.set(x, y + (up ? FLOOD_BEAM_HEIGHT / 2 : -FLOOD_BEAM_HEIGHT / 2), z);
+    this.groups[zone].add(beam);
+    this.pushMesh(beamMat, color, led, zone, segment);
   }
 
   // A Points cloud with per-vertex colors tracked for live/demo updates.

@@ -14,12 +14,17 @@ export interface PointStyle {
   size: number;
 }
 
+// A single-pixel flood: the fixture body plus a translucent beam glyph aimed up
+// or down from it. The beam is display-only and shares the fixture's channel.
+export type Aim = 'up' | 'down';
+
 // Sink the zone builders emit into: a Three.js scene in the browser, a plain
 // collector in the headless runner. Render arguments (outlines, styles) are
 // ignored by backends that only need the LED addresses.
 export interface LedScene {
   mesh(zone: ZoneId, segment: string, outline: [number, number][], origin: Vec3, led: Led): void;
   cone(zone: ZoneId, segment: string, led: Led): void;
+  flood(zone: ZoneId, segment: string, led: Led, aim: Aim): void;
   points(zone: ZoneId, segment: string, leds: Led[], style: PointStyle): void;
   line(zone: ZoneId, path: Vec3[]): void;
 }

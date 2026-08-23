@@ -43,6 +43,10 @@ class HeadlessScene implements LedScene {
     this.collect(zone, segment, led);
   }
 
+  flood(zone: ZoneId, segment: string, led: Led): void {
+    this.collect(zone, segment, led);
+  }
+
   points(zone: ZoneId, segment: string, leds: Led[]): void {
     for (const led of leds) this.collect(zone, segment, led);
   }

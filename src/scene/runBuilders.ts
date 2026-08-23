@@ -3,6 +3,7 @@ import { buildCanopy } from './build/canopy';
 import { buildRoseWindow } from './build/roseWindow';
 import { buildSpirelets } from './build/spirelets';
 import { buildSpires } from './build/spires';
+import { buildWash } from './build/wash';
 import type { LedScene } from './ledScene';
 import type { PixelMap } from './pixelData';
 
@@ -14,4 +15,5 @@ export function runBuilders(scene: LedScene, map: PixelMap): void {
   buildSpires(scene, map.spires);
   buildSpirelets(scene, map.spirelets);
   buildCanopy(scene, map.canopy);
+  buildWash(scene, map.wash);
 }

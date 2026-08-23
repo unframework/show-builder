@@ -71,6 +71,17 @@ const canopy = z.object({
   ),
 });
 
+const wash = z.object({
+  pixels: z.array(
+    z.object({
+      aim: z.enum(['up', 'down']),
+      position: vec3,
+      universe: z.number(),
+      universe_start_channel: z.number(),
+    }),
+  ),
+});
+
 export type CellPolygons = z.infer<typeof cellPolygons>;
 export type MainArches = z.infer<typeof mainArches>;
 export type MiniArches = z.infer<typeof miniArches>;
@@ -78,6 +89,7 @@ export type QuadArches = z.infer<typeof quadArches>;
 export type Spire = z.infer<typeof spire>;
 export type Spirelets = z.infer<typeof spirelets>;
 export type Canopy = z.infer<typeof canopy>;
+export type Wash = z.infer<typeof wash>;
 
 export interface PixelMap {
   cellPolygons: CellPolygons;
@@ -88,6 +100,7 @@ export interface PixelMap {
   spires: Spire[];
   spirelets: Spirelets;
   canopy: Canopy;
+  wash: Wash;
 }
 
 const QUAD_NAMES = [
@@ -115,6 +128,7 @@ export async function assemblePixelMap(load: JsonLoader): Promise<PixelMap> {
     spires,
     spireletsData,
     canopyData,
+    washData,
   ] = await Promise.all([
     load('cell-polygons.json', cellPolygons),
     load('arch-led-positions.json', mainArches),
@@ -124,6 +138,7 @@ export async function assemblePixelMap(load: JsonLoader): Promise<PixelMap> {
     Promise.all(SPIRE_NAMES.map((n) => load(`spire-led-positions-${n}.json`, spire))),
     load('spires-corners-led-positions.json', spirelets),
     load('canopy-led-positions.json', canopy),
+    load('wash-led-positions.json', wash),
   ]);
 
   return {
@@ -135,6 +150,7 @@ export async function assemblePixelMap(load: JsonLoader): Promise<PixelMap> {
     spires,
     spirelets: spireletsData,
     canopy: canopyData,
+    wash: washData,
   };
 }
 

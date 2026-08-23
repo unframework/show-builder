@@ -6,6 +6,7 @@ export const ZONE_DEFS = [
   { id: 'spires', label: 'Spires', hex: '#ffee44' },
   { id: 'spirelets', label: 'Spirelets', hex: '#ffbb22' },
   { id: 'canopy', label: 'Canopy', hex: '#77ff99' },
+  { id: 'wash', label: 'Wash', hex: '#ff66dd' },
 ] as const;
 
 export type ZoneId = (typeof ZONE_DEFS)[number]['id'];
