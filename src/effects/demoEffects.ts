@@ -132,16 +132,14 @@ const BREATHE_PERIOD = 8;
 // Brightness added.
 const BREATHE_DEPTH = 1;
 // Attack fraction of the cycle: small = snappy rise, long slow release.
-const BREATHE_ATTACK = 0.2;
+const BREATHE_ATTACK = 0.1;
 // Period wobble: ± cycles of phase jitter, and how fast that jitter itself drifts.
 const BREATHE_WOBBLE = 0.15;
 const BREATHE_WOBBLE_RATE = 0.03;
 const BREATHE_SEED = 41;
-// Faint-blue vertical background gradient + near-white blob core.
-const BG_HUE = 0.6;
 const BG_SAT = 0.7;
 const BG_MAX = 0.15; // peak faint-blue lightness at the crown
-const BUBBLE_L = 0.35;
+const BUBBLE_L = 0.95;
 
 // Stateless integer hash → [0,1), decorrelated between neighboring inputs.
 const hashU = (a: number, b: number, c: number) => {
@@ -384,18 +382,23 @@ export function createDemoEffects(
         (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
       ];
     },
-    'rising-bubbles': ({ index, yn, phase }) => {
+    'rising-bubbles': ({ index, xn, yn, zn, phase }) => {
       const breathePhase = wrap(
         phase / BREATHE_PERIOD +
           BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
       );
       const breatheAdd = BREATHE_DEPTH * asymPulse(breathePhase, BREATHE_ATTACK);
 
-      const bgL = BG_MAX * yn * yn;
-      const bgHue = noise4D(phase * 0.01, 2, 0, 0);
+      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1);
+      const bgV = noise4D(sx, sy, sz, phase * 0.1);
+      const bgAmt = smoothstep(0.1 - 0.15, 0.1 + 0.15, bgV - breatheAdd * 0.2);
+      const yoff = (1 - yn) * (1 - yn);
+      const bgHue = 0.65 + 0.08 * bgAmt + 0.1 * yoff;
+      const bgL = BG_MAX * 0.5 + 0.5 * BG_MAX * bgAmt;
+
       const sid = strands.id[index];
       if (sid < 0) {
-        return [bgHue, BG_SAT, 0.2 + bgL * (1 + breatheAdd * 2)];
+        return [bgHue + 0.15, BG_SAT, 0.2 + bgL * (1 + breatheAdd * 3)];
       }
 
       const t = strands.t[index];
@@ -416,7 +419,7 @@ export function createDemoEffects(
       return [
         bgHue + tint * amt,
         BG_SAT * (1 - amt),
-        (bgL * (1 + breatheAdd) + breatheAdd * 0.01) * (1 - amt) + BUBBLE_L * amt,
+        (bgL * (1 + breatheAdd * 3) + breatheAdd * 0.01) * (1 - amt) + BUBBLE_L * amt,
       ];
     },
   };
