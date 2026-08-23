@@ -11,6 +11,7 @@ import { assemblePixelMap, type PixelMap } from '../scene/pixelData';
 import { runBuilders } from '../scene/runBuilders';
 import { ZONE_DEFS, type ZoneId } from '../scene/zones';
 import { startControlServer } from './controlServer';
+import { loadPetalExpander } from './petalExpand';
 import { createSettingsSaver, loadSettings, resolveStateDir } from './settingsStore';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -109,7 +110,12 @@ async function main(): Promise<void> {
   const saver = createSettingsSaver(stateDir);
 
   const output = new SacnOutput(saved.sacnHost ?? SACN_HOST, saved.sacnPort ?? SACN_PORT);
-  const source = new EffectSource(pixels, focus, output.emit);
+  const expander = await loadPetalExpander(PIXEL_MAP_DIR);
+  const source = new EffectSource(
+    pixels,
+    focus,
+    expander ? expander.wrap(output.emit) : output.emit,
+  );
   applyEffectSettings(source, saved);
 
   const persist = (): void => {
@@ -139,7 +145,8 @@ async function main(): Promise<void> {
     onPersist: persist,
   });
   const { host: sacnHost, port: sacnPort } = output.destination;
-  console.log(`[runner] ${pixels.length} pixels → sACN ${sacnHost}:${sacnPort} @ ${FPS}fps`);
+  const rose = expander ? ' + rose petal expansion (u76–u139)' : '';
+  console.log(`[runner] ${pixels.length} pixels → sACN ${sacnHost}:${sacnPort} @ ${FPS}fps${rose}`);
 }
 
 void main().catch((err) => {
