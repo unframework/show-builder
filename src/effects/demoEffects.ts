@@ -93,39 +93,43 @@ const SEARCH_SPEED = Math.PI; // axis rotation, radians per beat (π = one half-
 const SEARCH_WIDTH = 0.35; // angular half-width of each beam, radians
 const SEARCH_GAIN = 0.3; // lightness added at the beam core
 
-// ---- rising bubbles (procedural / cellular) --------------------------------
-// The XZ plane is a grid of columns; each column procedurally emits bubbles that
-// rise from the floor (yn 0) to the surface (yn 1). Every bubble is derived from
-// its (cell, temporalIndex) via a hash — no stored state. The XZ hit is discrete
-// (a pixel's own cell); only the vertical edge is soft.
-const BUBBLE_GRID_X = 80;
-const BUBBLE_GRID_Z = 80;
-// Bubble cycles per phase unit. rise time = DUTY / rate phase units.
-const BUBBLE_RATE = 0.15;
-// ± fraction of per-column rate jitter (varies each column's speed/frequency).
-const BUBBLE_RATE_JITTER = 0.35;
-// Fraction of a column's cycle the bubble is travelling; the rest is a quiet gap.
-const BUBBLE_DUTY = 0.7;
-// Vertical half-thickness (normalized) range: the soft edge along the rise.
-const BUBBLE_THICKNESS_MIN = 0.02;
-const BUBBLE_THICKNESS_MAX = 0.03;
-// ± fraction applied per bubble to its brightness.
-const BUBBLE_GAIN_JITTER = 0.2;
-// Per-bubble hue offset around the blue base, hue units.
-const BUBBLE_TINT = 0.06;
-// Fade a bubble in off the floor and out as it nears the top.
-const BUBBLE_FLOOR_FADE = 0.08;
-const BUBBLE_SURFACE = 0.9;
-// Distinct salts so independent hash channels don't correlate.
-const BUBBLE_SALT_OFFSET = 7919;
-const BUBBLE_SALT_RATE = 6857;
-// Faint-blue vertical background gradient + near-white bubble core.
+// ---- rising bubbles (strand / topology) ------------------------------------
+// Blobs slide UP each arch leg, treated as a near-vertical strand. Each arch
+// splits into two legs at its apex; per pixel we precompute a strand id and a
+// bottom→top parameter, then read an animated 1-D band of 4D noise along it.
+// The strand id offsets the noise slice so neighbouring strands decorrelate.
+const STRAND_ZONES = new Set<ZoneId>([
+  'mainArches',
+  'miniArches',
+  'quadArches',
+  'spires',
+  'spirelets',
+]);
+// Noise features per strand length; higher = more, shorter blobs up the leg.
+const STRAND_FREQ = 12;
+// Upward slide of the band per phase unit.
+const STRAND_SPEED = 0.2 * STRAND_FREQ;
+// Slow morph of the band over time, independent of the upward slide.
+const STRAND_TIME = 0.05;
+// Spacing between strands' noise slices so neighbours decorrelate.
+const STRAND_SEP = 12;
+// Blob threshold + half-width of the black↔white ramp, in noise units. Higher
+// threshold = sparser blobs; larger edge = softer, fuzzier blob boundaries.
+const STRAND_THRESHOLD = 0.75;
+const STRAND_EDGE = 0.18;
+// Faint per-strand hue offset around the blue base, hue units.
+const STRAND_TINT = 0.16;
+// Gentle dimming of blobs as they reach the arch tip: amount, and the t at which
+// the fade begins (1 = apex). Keeps the very tips from reading as hard dots.
+const STRAND_TIP_FADE = 0.4;
+const STRAND_TIP_START = 0.82;
+// Faint-blue vertical background gradient + near-white blob core.
 const BG_HUE = 0.6;
 const BG_SAT = 0.7;
 const BG_MAX = 0.05; // peak faint-blue lightness at the crown
 const BUBBLE_L = 0.85;
 
-// Stateless integer hash → [0,1), decorrelated between neighboring cells.
+// Stateless integer hash → [0,1), decorrelated between neighboring inputs.
 const hashU = (a: number, b: number, c: number) => {
   let h =
     Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1) ^ Math.imul(c | 0, 0x9e3779b1);
@@ -133,6 +137,68 @@ const hashU = (a: number, b: number, c: number) => {
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 };
+
+interface StrandField {
+  // Per pixel: strand id (-1 = not on an animated strand), b + t*h is
+  // the pixel's true position in space.
+  id: Int32Array;
+  t: Float32Array;
+  b: Float32Array;
+  h: Float32Array;
+}
+
+// Split animated segments into bottom→top strands. Arch segments carry both legs
+// plus the apex in emit order (up leg A, over the apex, down leg B), so each arch
+// yields two strands split at its highest pixel; single-vertical segments (spires)
+// yield one. Segments are contiguous in emit order, so index order is strand order.
+function strandField(pixels: PixelDescriptor[]): StrandField {
+  const id = new Int32Array(pixels.length).fill(-1);
+  const t = new Float32Array(pixels.length);
+  const b = new Float32Array(pixels.length);
+  const h = new Float32Array(pixels.length);
+
+  const groups = new Map<string, number[]>();
+  pixels.forEach((p, i) => {
+    if (!STRAND_ZONES.has(p.zone)) return;
+    const g = groups.get(p.segment);
+    if (g) g.push(i);
+    else groups.set(p.segment, [i]);
+  });
+
+  let nextId = 0;
+  const walk = (idxs: number[]) => {
+    const sid = nextId++;
+    const last = idxs.length - 1;
+    const y0 = pixels[idxs[0]].yn;
+    const y1 = pixels[idxs[last]].yn;
+    const zone = pixels[idxs[0]].zone;
+    const span = Math.abs(y1 - y0) * (zone === 'spires' ? 0.2 : 1);
+    const bottom = Math.min(y0, y1);
+    const bottomUp = last === 0 || y0 <= y1;
+    idxs.forEach((pi, k) => {
+      id[pi] = sid;
+      b[pi] = bottom;
+      h[pi] = span;
+      const f = last === 0 ? 0 : k / last;
+      t[pi] = bottomUp ? f : 1 - f;
+    });
+  };
+
+  for (const idxs of groups.values()) {
+    let apex = 0;
+    let apexYn = -Infinity;
+    idxs.forEach((pi, k) => {
+      if (pixels[pi].yn > apexYn) {
+        apexYn = pixels[pi].yn;
+        apex = k;
+      }
+    });
+    walk(idxs.slice(0, apex + 1));
+    if (apex + 1 <= idxs.length - 1) walk(idxs.slice(apex + 1));
+  }
+
+  return { id, t, b, h };
+}
 
 // Zones whose whole element lights as one solid ring; every other zone ripples
 // per-pixel. An arch samples the ring field at its pixel nearest the focus.
@@ -227,6 +293,7 @@ export function createDemoEffects(
 ): Record<DemoEffectId, DemoEffect['hsl'] | undefined> {
   const [fx, fy, fz] = focus;
   const rings = ringField(pixels, focus);
+  const strands = strandField(pixels);
   return {
     zone: undefined,
     'lr-sweep': ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))],
@@ -295,30 +362,23 @@ export function createDemoEffects(
         (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
       ];
     },
-    'rising-bubbles': ({ xn, yn, zn, phase }) => {
-      const ix = Math.floor(xn * BUBBLE_GRID_X);
-      const iz = Math.floor(zn * BUBBLE_GRID_Z);
-      let c = 0;
-      let tint = 0;
-      const rate =
-        BUBBLE_RATE *
-        (1 - BUBBLE_RATE_JITTER + 2 * BUBBLE_RATE_JITTER * hashU(ix, iz, BUBBLE_SALT_RATE));
-      const tc = phase * rate + hashU(ix, iz, BUBBLE_SALT_OFFSET);
-      const life = tc - Math.floor(tc);
-      if (life < BUBBLE_DUTY) {
-        const k = Math.floor(tc);
-        const u = life / BUBBLE_DUTY;
-        const thickness =
-          BUBBLE_THICKNESS_MIN +
-          (BUBBLE_THICKNESS_MAX - BUBBLE_THICKNESS_MIN) * hashU(ix, iz, k + 2027);
-        const gain = 1 - BUBBLE_GAIN_JITTER + 2 * BUBBLE_GAIN_JITTER * hashU(ix, iz, k + 4049);
-        const fade = smoothstep(0, BUBBLE_FLOOR_FADE, u) * (1 - smoothstep(BUBBLE_SURFACE, 1, u));
-        const dy = (yn - u) / thickness;
-        c = Math.min(1, Math.exp(-dy * dy) * fade * gain);
-        tint = (hashU(ix, iz, k + 3037) - 0.5) * BUBBLE_TINT;
-      }
+    'rising-bubbles': ({ index, yn, phase }) => {
       const bgL = BG_MAX * yn * yn;
-      return [BG_HUE + tint * c, BG_SAT * (1 - c), bgL * (1 - c) + BUBBLE_L * c];
+      const sid = strands.id[index];
+      if (sid < 0) return [BG_HUE, BG_SAT, bgL];
+      const t = strands.t[index];
+      const along = Math.sqrt(strands.b[index] + t * strands.h[index]);
+      const v = noise4D(
+        sid * STRAND_SEP,
+        along * STRAND_FREQ - phase * STRAND_SPEED,
+        phase * STRAND_TIME,
+        0,
+      );
+      const tipFade = 1 - STRAND_TIP_FADE * smoothstep(STRAND_TIP_START, 1, t);
+      const amt =
+        smoothstep(STRAND_THRESHOLD - STRAND_EDGE, STRAND_THRESHOLD + STRAND_EDGE, v) * tipFade;
+      const tint = (hashU(sid, 0, 1) - 0.5) * STRAND_TINT;
+      return [BG_HUE + tint * amt, BG_SAT * (1 - amt), bgL * (1 - amt) + BUBBLE_L * amt];
     },
   };
 }
