@@ -104,6 +104,7 @@ const STRAND_ZONES = new Set<ZoneId>([
   'quadArches',
   'spires',
   'spirelets',
+  'wash',
 ]);
 // Noise features per strand length; higher = more, shorter blobs up the leg.
 const STRAND_FREQ = 12;
@@ -393,15 +394,21 @@ export function createDemoEffects(
       const bgL = BG_MAX * yn * yn;
       const bgHue = noise4D(phase * 0.01, 2, 0, 0);
       const sid = strands.id[index];
-      if (sid < 0) return [bgHue + 0.2, BG_SAT, bgL * (1 + breatheAdd * 2)];
+      if (sid < 0) {
+        return [bgHue, BG_SAT, 0.2 + bgL * (1 + breatheAdd * 2)];
+      }
+
       const t = strands.t[index];
-      const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * strands.h[index]) - 0.2;
-      const v = noise4D(
-        sid * STRAND_SEP,
-        along * STRAND_FREQ - phase * STRAND_SPEED,
-        phase * STRAND_TIME,
-        0,
-      );
+      const h = strands.h[index];
+      const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * h) - 0.2;
+      const v = h
+        ? noise4D(
+            sid * STRAND_SEP,
+            along * STRAND_FREQ - phase * STRAND_SPEED,
+            phase * STRAND_TIME,
+            0,
+          )
+        : 0;
       const tipFade = 1 - STRAND_TIP_FADE * smoothstep(STRAND_TIP_START, 1, t);
       const amt =
         smoothstep(STRAND_THRESHOLD - STRAND_EDGE, STRAND_THRESHOLD + STRAND_EDGE, v) * tipFade;
