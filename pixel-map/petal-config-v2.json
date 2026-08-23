@@ -1,0 +1,1822 @@
+{
+  "_notes": [
+    "Updated 2026-06-02 from actual petal P01 install (petal-test.ino, Arduino session).",
+    "Previous v2 was estimated from petal-leds-v6-jk.svg (John's hand-colored map, 2026-05-18).",
+    "Actual LED count: 517 (was estimated 501). Minor cell-boundary shifts from physical install:",
+    "  slightly more LEDs fell into some cells than expected, causing cumulative offsets.",
+    "default_segments reflects P01 \u2014 P01 does NOT need a petal_override entry.",
+    "Add petal_override entries only for petals that DIFFER from P01.",
+    "Six cells visited TWICE (strip threads through on two passes): 4a, 4c, 5b, 6c, 7b, 7c.",
+    "skip_before = passage/wire LEDs consumed BEFORE this cell run starts."
+  ],
+  "version": 2,
+  "leds_per_meter": 60,
+  "physical_length_mm": 8617,
+  "default_segments": [
+    {
+      "cell": "2a",
+      "skip_before": 0,
+      "count": 25
+    },
+    {
+      "cell": "4a",
+      "skip_before": 1,
+      "count": 33
+    },
+    {
+      "cell": "5a",
+      "skip_before": 0,
+      "count": 12
+    },
+    {
+      "cell": "6a",
+      "skip_before": 1,
+      "count": 43
+    },
+    {
+      "cell": "5b",
+      "skip_before": 0,
+      "count": 24
+    },
+    {
+      "cell": "4a",
+      "skip_before": 0,
+      "count": 19
+    },
+    {
+      "cell": "3b",
+      "skip_before": 1,
+      "count": 47
+    },
+    {
+      "cell": "4c",
+      "skip_before": 0,
+      "count": 19
+    },
+    {
+      "cell": "5b",
+      "skip_before": 1,
+      "count": 24
+    },
+    {
+      "cell": "6c",
+      "skip_before": 0,
+      "count": 31
+    },
+    {
+      "cell": "7c",
+      "skip_before": 0,
+      "count": 11
+    },
+    {
+      "cell": "7b",
+      "skip_before": 1,
+      "count": 25
+    },
+    {
+      "cell": "7a",
+      "skip_before": 0,
+      "count": 36
+    },
+    {
+      "cell": "7b",
+      "skip_before": 0,
+      "count": 32
+    },
+    {
+      "cell": "7c",
+      "skip_before": 0,
+      "count": 24
+    },
+    {
+      "cell": "6c",
+      "skip_before": 0,
+      "count": 12
+    },
+    {
+      "cell": "5c",
+      "skip_before": 1,
+      "count": 12
+    },
+    {
+      "cell": "4c",
+      "skip_before": 0,
+      "count": 33
+    },
+    {
+      "cell": "2c",
+      "skip_before": 1,
+      "count": 26
+    },
+    {
+      "cell": "1b",
+      "skip_before": 1,
+      "count": 21
+    }
+  ],
+  "_totals": {
+    "passage_leds": 8,
+    "cell_leds": 509,
+    "total_accounted": 517,
+    "note": "cell_leds are addressable pixels mapped to named cells; passage_leds are wire/gap LEDs that stay dark"
+  },
+  "petal_overrides": {
+    "_note": "Only petals that differ from default_segments (P01) get an entry here. P02 pending \u2014 differs from P03 in 1b skip_before (=3, construction gap). P14\u2013P16 pending calibration.",
+    "P01": {
+      "_confirmed": false,
+      "_note": "Provisional \u2014 using P03's pattern; P01 physical re-do (final IP65 strip) to be matched/confirmed.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P02": {
+      "_confirmed": true,
+      "_note": "From the working P02 Arduino petal test (added 2026-07-13). 517 LEDs; 3b=46 (was 47).",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 11
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 33
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 26
+        },
+        {
+          "cell": "1b",
+          "skip_before": 3,
+          "count": 22
+        }
+      ]
+    },
+    "P03": {
+      "_confirmed": "2026-06-25",
+      "_note": "9 differences from P01: 3b\u22121, 5b pt2\u22121, 7c pt1\u22121, 7a\u22121, 7b pt2\u22121, 6c pt2+1, 4c pt2\u22121, 2c+1, 1b count+1. 3 tail LEDs (514\u2013516) stay dark.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P04": {
+      "_confirmed": "2026-06-25",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P05": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P06": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P07": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P08": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P09": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P10": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P11": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P12": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P13": {
+      "_confirmed": "2026-06-30",
+      "_note": "Identical to P03.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P14": {
+      "_confirmed": "2026-06-30",
+      "_note": "Differs from P03 only at 1b: skip_before 1\u21924 (3 extra dead LEDs between 2c and 1b, construction gap). Uses all 517 LEDs \u2014 no tail.",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 4,
+          "count": 22
+        }
+      ]
+    },
+    "P15": {
+      "_confirmed": true,
+      "_note": "P03's pattern (fit during the calibration groove).",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    },
+    "P16": {
+      "_confirmed": true,
+      "_note": "P03's pattern (fit during the calibration groove).",
+      "segments": [
+        {
+          "cell": "2a",
+          "skip_before": 0,
+          "count": 25
+        },
+        {
+          "cell": "4a",
+          "skip_before": 1,
+          "count": 33
+        },
+        {
+          "cell": "5a",
+          "skip_before": 0,
+          "count": 12
+        },
+        {
+          "cell": "6a",
+          "skip_before": 1,
+          "count": 43
+        },
+        {
+          "cell": "5b",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "4a",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "3b",
+          "skip_before": 1,
+          "count": 46
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 19
+        },
+        {
+          "cell": "5b",
+          "skip_before": 1,
+          "count": 23
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 10
+        },
+        {
+          "cell": "7b",
+          "skip_before": 1,
+          "count": 25
+        },
+        {
+          "cell": "7a",
+          "skip_before": 0,
+          "count": 35
+        },
+        {
+          "cell": "7b",
+          "skip_before": 0,
+          "count": 31
+        },
+        {
+          "cell": "7c",
+          "skip_before": 0,
+          "count": 24
+        },
+        {
+          "cell": "6c",
+          "skip_before": 0,
+          "count": 13
+        },
+        {
+          "cell": "5c",
+          "skip_before": 1,
+          "count": 12
+        },
+        {
+          "cell": "4c",
+          "skip_before": 0,
+          "count": 32
+        },
+        {
+          "cell": "2c",
+          "skip_before": 1,
+          "count": 27
+        },
+        {
+          "cell": "1b",
+          "skip_before": 1,
+          "count": 22
+        }
+      ]
+    }
+  }
+}

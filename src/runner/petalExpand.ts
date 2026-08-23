@@ -39,15 +39,22 @@ const petalOverride = z.object({
 
 const petalConfig = z.object({
   default_segments: z.array(segment),
-  petal_overrides: z.record(z.string(), petalOverride).optional(),
+  petal_overrides: z.record(z.string(), z.unknown()).optional(),
 });
 export type PetalConfig = z.infer<typeof petalConfig>;
 
+// petal_overrides mixes P01–P16 entries with sidecar metadata (`_note`, per-petal
+// `_confirmed`); an uncalibrated or malformed entry falls back to the P01 baseline.
 function resolveSegments(config: PetalConfig): Map<number, Segment[]> {
   const byPetal = new Map<number, Segment[]>();
   for (let petal = 1; petal <= PETALS; petal++) {
-    const override = config.petal_overrides?.[`P${String(petal).padStart(2, '0')}`];
-    byPetal.set(petal, override?.segments ?? override?.default_segments ?? config.default_segments);
+    const override = petalOverride.safeParse(
+      config.petal_overrides?.[`P${String(petal).padStart(2, '0')}`],
+    );
+    const segments = override.success
+      ? (override.data.segments ?? override.data.default_segments)
+      : undefined;
+    byPetal.set(petal, segments ?? config.default_segments);
   }
   return byPetal;
 }
