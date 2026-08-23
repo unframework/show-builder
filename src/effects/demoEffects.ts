@@ -108,7 +108,7 @@ const STRAND_ZONES = new Set<ZoneId>([
 // Noise features per strand length; higher = more, shorter blobs up the leg.
 const STRAND_FREQ = 12;
 // Upward slide of the band per phase unit.
-const STRAND_SPEED = 0.2 * STRAND_FREQ;
+const STRAND_SPEED = 0.04 * STRAND_FREQ;
 // Slow morph of the band over time, independent of the upward slide.
 const STRAND_TIME = 0.05;
 // Spacing between strands' noise slices so neighbours decorrelate.
@@ -123,11 +123,24 @@ const STRAND_TINT = 0.16;
 // the fade begins (1 = apex). Keeps the very tips from reading as hard dots.
 const STRAND_TIP_FADE = 0.4;
 const STRAND_TIP_START = 0.82;
+// Slow global brightness pulse on the blobs. BREATHE_PERIOD is in phase units
+// (~seconds at speed 1). The period wobbles via noise while staying strictly
+// recurring: the wobble's slope stays well under the base rate, so the pulse
+// never reverses — it just breathes a little early/late.
+const BREATHE_PERIOD = 8;
+// Brightness added.
+const BREATHE_DEPTH = 1;
+// Attack fraction of the cycle: small = snappy rise, long slow release.
+const BREATHE_ATTACK = 0.2;
+// Period wobble: ± cycles of phase jitter, and how fast that jitter itself drifts.
+const BREATHE_WOBBLE = 0.15;
+const BREATHE_WOBBLE_RATE = 0.03;
+const BREATHE_SEED = 41;
 // Faint-blue vertical background gradient + near-white blob core.
 const BG_HUE = 0.6;
 const BG_SAT = 0.7;
-const BG_MAX = 0.05; // peak faint-blue lightness at the crown
-const BUBBLE_L = 0.85;
+const BG_MAX = 0.15; // peak faint-blue lightness at the crown
+const BUBBLE_L = 0.35;
 
 // Stateless integer hash → [0,1), decorrelated between neighboring inputs.
 const hashU = (a: number, b: number, c: number) => {
@@ -136,6 +149,14 @@ const hashU = (a: number, b: number, c: number) => {
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
+
+// One pulse per unit of p (p in [0,1)): a cosine bell time-warped so the rise is
+// squeezed into the first `attack` of the cycle and the fall stretched across the
+// rest — a smooth sine-like pulse with fast attack and slow release.
+const asymPulse = (p: number, attack: number) => {
+  const w = p < attack ? 0.5 * (p / attack) : 0.5 + 0.5 * ((p - attack) / (1 - attack));
+  return 0.5 - 0.5 * Math.cos(2 * Math.PI * w);
 };
 
 interface StrandField {
@@ -363,11 +384,18 @@ export function createDemoEffects(
       ];
     },
     'rising-bubbles': ({ index, yn, phase }) => {
+      const breathePhase = wrap(
+        phase / BREATHE_PERIOD +
+          BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
+      );
+      const breatheAdd = BREATHE_DEPTH * asymPulse(breathePhase, BREATHE_ATTACK);
+
       const bgL = BG_MAX * yn * yn;
+      const bgHue = noise4D(phase * 0.01, 2, 0, 0);
       const sid = strands.id[index];
-      if (sid < 0) return [BG_HUE, BG_SAT, bgL];
+      if (sid < 0) return [bgHue + 0.2, BG_SAT, bgL * (1 + breatheAdd * 2)];
       const t = strands.t[index];
-      const along = Math.sqrt(strands.b[index] + t * strands.h[index]);
+      const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * strands.h[index]) - 0.2;
       const v = noise4D(
         sid * STRAND_SEP,
         along * STRAND_FREQ - phase * STRAND_SPEED,
@@ -378,7 +406,11 @@ export function createDemoEffects(
       const amt =
         smoothstep(STRAND_THRESHOLD - STRAND_EDGE, STRAND_THRESHOLD + STRAND_EDGE, v) * tipFade;
       const tint = (hashU(sid, 0, 1) - 0.5) * STRAND_TINT;
-      return [BG_HUE + tint * amt, BG_SAT * (1 - amt), bgL * (1 - amt) + BUBBLE_L * amt];
+      return [
+        bgHue + tint * amt,
+        BG_SAT * (1 - amt),
+        (bgL * (1 + breatheAdd) + breatheAdd * 0.01) * (1 - amt) + BUBBLE_L * amt,
+      ];
     },
   };
 }
