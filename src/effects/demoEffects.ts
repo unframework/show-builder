@@ -72,6 +72,14 @@ const RAY_EXPAND = 0.2;
 // Horizontal detail multiplier at the floor, ramping to full (1) at the top:
 // compresses the sampled X-coord low down so the bottom reads coarser than the crown.
 const RAY_DETAIL_FLOOR = 0.05;
+// Rays palette + modulation: a slow hue oscillation, a height hue tint, and the
+// beat's lightness gain layered over the color ramp.
+const RAY_HUE_SPIN_RATE = 0.5;
+const RAY_HUE_SPIN = 0.2;
+const RAY_HEIGHT_HUE = -0.2;
+const RAY_KICK_LIGHT = 0.6;
+const RAY_RAMP_START: RampPoint = { h: -0.2, s: 1, l: 0 };
+const RAY_RAMP_END: RampPoint = { h: 0.05, s: 1, l: 0.5 };
 
 // Concentric ripples radiating from the rose window.
 // Rings per unit distance from the focus.
@@ -343,10 +351,74 @@ const NOISE_KNOBS: KnobSchema = {
   },
 };
 
+const RAY_KNOBS: KnobSchema = {
+  zoom: {
+    label: 'scale',
+    base: { min: 0.5, max: 8, step: 0.1 },
+    kick: { min: -4, max: 4, step: 0.05 },
+    default: { base: RAY_NOISE_SCALE, kick: -RAY_EXPAND * RAY_NOISE_SCALE },
+  },
+  rise: {
+    label: 'scroll',
+    base: { min: -6, max: 6, step: 0.05 },
+    kick: { min: -4, max: 4, step: 0.05 },
+    default: { base: NOISE_RISE, kick: 0 },
+  },
+  timeRate: {
+    label: 'time',
+    base: { min: 0, max: 2, step: 0.01 },
+    kick: { min: -2, max: 2, step: 0.01 },
+    default: { base: NOISE_TIME, kick: 0 },
+  },
+  detailFloor: {
+    label: 'detail',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: RAY_DETAIL_FLOOR, kick: 0 },
+  },
+  depth: {
+    label: 'depth',
+    base: { min: 0, max: 0.5, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.01 },
+    default: { base: RAY_NOISE_DEPTH, kick: 0 },
+  },
+  thresholdAt: {
+    label: 'threshold',
+    base: { min: -1, max: 1, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.005 },
+    default: { base: NOISE_THRESHOLD, kick: PULSE_DEPTH },
+  },
+  thresholdEdge: {
+    label: 'edge',
+    base: { min: 0.001, max: 0.5, step: 0.001 },
+    kick: { min: -0.5, max: 0.5, step: 0.001 },
+    default: { base: NOISE_EDGE, kick: 0 },
+  },
+  lightGain: {
+    label: 'brightness',
+    base: { min: 0, max: 2, step: 0.01 },
+    kick: { min: -1, max: 2, step: 0.01 },
+    default: { base: 1, kick: RAY_KICK_LIGHT },
+  },
+  heightHue: {
+    label: 'height hue',
+    base: { min: -1, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: RAY_HEIGHT_HUE, kick: 0 },
+  },
+  hueSpin: {
+    label: 'hue spin',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: RAY_HUE_SPIN, kick: 0 },
+  },
+};
+
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
 // persisted per effect. Effects absent here have no knobs.
 export const EFFECT_KNOBS: Partial<Record<DemoEffectId, KnobSchema>> = {
   noise: NOISE_KNOBS,
+  'noise-rays': RAY_KNOBS,
 };
 
 export function createDemoEffects(
@@ -382,30 +454,24 @@ export function createDemoEffects(
       return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
     },
 
-    'noise-rays': ({ xn, yn, zn, phase, beat, bpm }) => {
+    'noise-rays': ({ xn, yn, zn, phase }, k) => {
       const dx = Math.abs(xn - fx);
       const dy = yn - fy;
-      const dz = (zn - fz) * RAY_NOISE_DEPTH;
+      const dz = (zn - fz) * k.depth;
       const r = Math.hypot(dx, dy, dz) || 1;
-      const kick = beatSpike(beat, bpm, PULSE_DECAY);
-      const zoom = (1 - RAY_EXPAND * kick) * RAY_NOISE_SCALE;
-      const detail = RAY_DETAIL_FLOOR + (1 - RAY_DETAIL_FLOOR) * 0.5 * (1 + dy / r);
+      const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
       const v = noise4D(
-        (dx / r) * zoom * detail,
-        (dy / r) * zoom - phase * NOISE_RISE,
-        (dz / r) * zoom,
-        phase * NOISE_TIME,
+        (dx / r) * k.zoom * detail,
+        (dy / r) * k.zoom - phase * k.rise,
+        (dz / r) * k.zoom,
+        phase * k.timeRate,
       );
-      const amt = smoothstep(
-        NOISE_THRESHOLD - NOISE_EDGE,
-        NOISE_THRESHOLD + NOISE_EDGE,
-        v - PULSE_DEPTH * kick,
-      );
-      const yoff = (1 - yn) * (1 - yn);
+      const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+      const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);
       return [
-        Math.sin(phase * 0.5) * 0.2 + -0.2 + 0.25 * amt - yoff * 0.2,
-        1,
-        (0.5 + 0.3 * kick) * amt,
+        h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
+        s,
+        l * k.lightGain,
       ];
     },
     rings: ({ index, phase, beat, bpm }) => {
