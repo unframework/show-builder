@@ -1,5 +1,6 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
 import { beatSpike, ramp2, smoothstep, threshold, verticalFade, type RampPoint } from './stages';
+import { type KnobSchema, type ResolvedKnobs } from './knobs';
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import type { ZoneId } from '../scene/zones';
@@ -21,7 +22,7 @@ export interface EffectInput {
 export interface DemoEffect {
   id: DemoEffectId;
   label: string;
-  hsl?: (input: EffectInput) => [number, number, number];
+  hsl?: (input: EffectInput, knobs: ResolvedKnobs) => [number, number, number];
 }
 
 // stable stuff reused across hot-reloads
@@ -303,6 +304,51 @@ export const DEMO_EFFECTS = [
 
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
 
+const NOISE_KNOBS: KnobSchema = {
+  timeRate: {
+    label: 'time',
+    base: { min: 0, max: 2, step: 0.01 },
+    kick: { min: -2, max: 2, step: 0.01 },
+    default: { base: NOISE_TIME, kick: 0 },
+  },
+  thresholdAt: {
+    label: 'threshold',
+    base: { min: -1, max: 1, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.005 },
+    default: { base: NOISE_THRESHOLD, kick: PULSE_DEPTH },
+  },
+  thresholdEdge: {
+    label: 'edge',
+    base: { min: 0.001, max: 0.5, step: 0.001 },
+    kick: { min: -0.5, max: 0.5, step: 0.001 },
+    default: { base: NOISE_EDGE, kick: 0 },
+  },
+  zoom: {
+    label: 'zoom',
+    base: { min: 0.2, max: 3, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: 1, kick: -PULSE_EXPAND },
+  },
+  lightGain: {
+    label: 'brightness',
+    base: { min: 0, max: 2, step: 0.01 },
+    kick: { min: -1, max: 2, step: 0.01 },
+    default: { base: 1, kick: NOISE_KICK_LIGHT },
+  },
+  heightHue: {
+    label: 'height hue',
+    base: { min: -1, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: NOISE_HEIGHT_HUE, kick: 0 },
+  },
+};
+
+// Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
+// persisted per effect. Effects absent here have no knobs.
+export const EFFECT_KNOBS: Partial<Record<DemoEffectId, KnobSchema>> = {
+  noise: NOISE_KNOBS,
+};
+
 export function createDemoEffects(
   { noise4D }: DemoEffectContext,
   pixels: PixelDescriptor[],
@@ -328,13 +374,12 @@ export function createDemoEffects(
         0.02 + 0.55 * b,
       ];
     },
-    noise: ({ xn, yn, zn, phase, beat, bpm }) => {
-      const kick = beatSpike(beat, bpm, PULSE_DECAY);
-      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1 - PULSE_EXPAND * kick);
-      const v = noise4D(sx, sy, sz, phase * NOISE_TIME);
-      const amt = threshold(v - PULSE_DEPTH * kick, { at: NOISE_THRESHOLD, edge: NOISE_EDGE });
+    noise: ({ xn, yn, zn, phase }, k) => {
+      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
+      const v = noise4D(sx, sy, sz, phase * k.timeRate);
+      const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
       const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
-      return [h + NOISE_HEIGHT_HUE * verticalFade(yn), s, l * (1 + NOISE_KICK_LIGHT * kick)];
+      return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
     },
 
     'noise-rays': ({ xn, yn, zn, phase, beat, bpm }) => {

@@ -5,16 +5,19 @@ import {
   effectResumeState,
   type ControlState,
   type EffectEvent,
+  type EffectParams,
   type EffectResumeState,
   type EffectSettings,
 } from './controlMessages';
 import {
   createDemoEffectContext,
   createDemoEffects,
+  EFFECT_KNOBS,
   type DemoEffect,
   type DemoEffectContext,
   type DemoEffectId,
 } from './demoEffects';
+import { defaultKnobValues, kickCurve, resolveKnobs, type ResolvedKnobs } from './knobs';
 
 type Emit = (universe: number, bytes: Uint8Array) => void;
 type Listener = (event: EffectEvent) => void;
@@ -26,10 +29,25 @@ export function applyEffectSettings(source: EffectSource, settings: EffectSettin
   if (settings.speed !== undefined) source.setSpeed(settings.speed);
   if (settings.brightness !== undefined) source.setBrightness(settings.brightness);
   if (settings.bpm !== undefined) source.setBpm(settings.bpm);
+  if (settings.params) source.setParams(settings.params);
   if (settings.running !== undefined) source.setRunning(settings.running);
 }
 
 const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
+
+const EMPTY_KNOBS: ResolvedKnobs = {};
+
+// A fresh copy so each emitted state has a new identity (React re-renders on it)
+// and consumers can't mutate the engine's live knob values.
+function cloneParams(params: EffectParams): EffectParams {
+  const out: EffectParams = {};
+  for (const [effect, knobs] of Object.entries(params)) {
+    const copy: Record<string, { base: number; kick: number }> = {};
+    for (const [key, v] of Object.entries(knobs)) copy[key] = { base: v.base, kick: v.kick };
+    out[effect] = copy;
+  }
+  return out;
+}
 
 // Avoid double-flash when re-cueing the beat this close to the downbeat.
 const CUE_NUDGE_MAX_SEC = 0.2;
@@ -64,6 +82,7 @@ export class EffectSource {
   private bpm = 120;
   private beat = 0;
   private beatNudge = 0;
+  private readonly params: EffectParams = {};
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit, resume?: ResumeState) {
     this.pixels = pixels;
@@ -71,6 +90,10 @@ export class EffectSource {
     this.context = resume?.context ?? createDemoEffectContext();
     this.hslById = createDemoEffects(this.context, pixels, focus);
     this.hsl = this.hslById[this.effectId];
+
+    for (const [id, schema] of Object.entries(EFFECT_KNOBS)) {
+      if (schema) this.params[id] = defaultKnobValues(schema);
+    }
 
     const length = new Map<number, number>();
     for (const p of pixels) {
@@ -95,6 +118,7 @@ export class EffectSource {
       speed: this.speed,
       brightness: this.brightness,
       bpm: this.bpm,
+      params: cloneParams(this.params),
     };
   }
 
@@ -108,6 +132,7 @@ export class EffectSource {
         bpm: this.bpm,
         phase: this.phase,
         beat: this.beat + this.beatNudge,
+        params: this.params,
       },
       context: this.context,
     };
@@ -127,6 +152,17 @@ export class EffectSource {
     this.phase = state.phase;
     this.beat = state.beat;
     this.beatNudge = 0;
+    if (state.params) this.mergeParams(state.params);
+  }
+
+  private mergeParams(incoming: EffectParams): void {
+    for (const [effect, knobs] of Object.entries(incoming)) {
+      const target = this.params[effect];
+      if (!target) continue;
+      for (const [key, value] of Object.entries(knobs)) {
+        if (target[key]) target[key] = { base: value.base, kick: value.kick };
+      }
+    }
   }
 
   private notify(event: EffectEvent): void {
@@ -169,6 +205,19 @@ export class EffectSource {
     this.notify(this.getState());
   }
 
+  setParams(params: EffectParams): void {
+    this.mergeParams(params);
+    this.notify(this.getState());
+  }
+
+  setParam(effect: DemoEffectId, key: string, field: 'base' | 'kick', value: number): void {
+    const knob = this.params[effect]?.[key];
+    if (!knob || knob[field] === value) return;
+
+    knob[field] = value;
+    this.notify(this.getState());
+  }
+
   cueBeat(): void {
     const error = this.beat - Math.round(this.beat);
     if (error > 0 && (error * 60) / this.bpm <= CUE_NUDGE_MAX_SEC) {
@@ -197,6 +246,10 @@ export class EffectSource {
 
     const hsl = this.hsl;
     const brightness = this.brightness;
+    const schema = EFFECT_KNOBS[this.effectId];
+    const knobs = schema
+      ? resolveKnobs(schema, this.params[this.effectId], kickCurve(this.beat, this.bpm))
+      : EMPTY_KNOBS;
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const bytes = this.buffers.get(p.universe)!;
@@ -206,16 +259,19 @@ export class EffectSource {
         bytes[p.ch0 + 2] = clampByte(p.base[2] * brightness);
         continue;
       }
-      const [h, s, l] = hsl({
-        xn: p.xn,
-        yn: p.yn,
-        zn: p.zn,
-        index: i,
-        phase: this.phase,
-        beat: this.beat,
-        bpm: this.bpm,
-        twinkleOffset: p.twinkleOffset,
-      });
+      const [h, s, l] = hsl(
+        {
+          xn: p.xn,
+          yn: p.yn,
+          zn: p.zn,
+          index: i,
+          phase: this.phase,
+          beat: this.beat,
+          bpm: this.bpm,
+          twinkleOffset: p.twinkleOffset,
+        },
+        knobs,
+      );
       const [r, g, b] = hslToRgb(h, s, l);
       bytes[p.ch0] = clampByte(r * brightness);
       bytes[p.ch0 + 1] = clampByte(g * brightness);

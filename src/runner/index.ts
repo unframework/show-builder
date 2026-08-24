@@ -124,8 +124,8 @@ async function main(): Promise<void> {
 
   const persist = (): void => {
     const { host, port } = output.destination;
-    const { effect, running, speed, brightness, bpm } = source.getState();
-    saver.save({ sacnHost: host, sacnPort: port, effect, running, speed, brightness, bpm });
+    const { effect, running, speed, brightness, bpm, params } = source.getState();
+    saver.save({ sacnHost: host, sacnPort: port, effect, running, speed, brightness, bpm, params });
   };
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {

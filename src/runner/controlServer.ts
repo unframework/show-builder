@@ -86,6 +86,9 @@ export function startControlServer({
         case 'set-running':
           source.setRunning(cmd.running);
           break;
+        case 'set-param':
+          source.setParam(cmd.effect, cmd.key, cmd.field, cmd.value);
+          break;
         case 'set-output':
           output.setDestination(cmd.host, cmd.port);
           broadcast(outputEvent());

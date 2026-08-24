@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { BrightnessControl } from '../components/BrightnessControl';
 import { EffectControls } from '../components/EffectControls';
+import { EffectParamControls } from '../components/EffectParamControls';
 import { RunToggle } from '../components/RunToggle';
 import { OutputControls } from './OutputControls';
 import { createWsControl, type WsControl } from './wsControl';
@@ -39,6 +40,7 @@ export function RunnerApp() {
       {control && (
         <div className="mb-auto">
           <EffectControls source={control} />
+          <EffectParamControls source={control} />
         </div>
       )}
     </div>

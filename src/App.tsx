@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BrightnessControl } from './components/BrightnessControl';
 import { EffectControls } from './components/EffectControls';
+import { EffectParamControls } from './components/EffectParamControls';
 import { RunToggle } from './components/RunToggle';
 import { Sidenav } from './components/Sidenav';
 import { Toolbar } from './components/Toolbar';
@@ -55,8 +56,9 @@ export function App() {
             !engine && <span className="loading loading-dots loading-lg text-base-content/50" />
           )}
         </div>
-        <div className="rounded-lg overflow-hidden">
+        <div className="rounded-lg overflow-y-auto max-h-[35dvh]">
           <EffectControls source={effectSource} />
+          <EffectParamControls source={effectSource} />
         </div>
       </div>
 

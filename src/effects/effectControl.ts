@@ -9,6 +9,8 @@ export interface EffectControl {
   setSpeed(speed: number): Promise<void>;
   setBrightness(brightness: number): Promise<void>;
   setBpm(bpm: number): Promise<void>;
+  // Set a per-effect knob's base value or its beat-kick amount.
+  setParam(effect: DemoEffectId, key: string, field: 'base' | 'kick', value: number): Promise<void>;
   // Halt phase advance and emission; the beat clock keeps running
   setRunning(running: boolean): Promise<void>;
   // Anchor the beat clock to the downbeat

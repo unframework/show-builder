@@ -85,6 +85,9 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
     setBpm: async (bpm) => {
       sourceRef.current?.setBpm(bpm);
     },
+    setParam: async (effect, key, field, value) => {
+      sourceRef.current?.setParam(effect, key, field, value);
+    },
     setRunning: async (running) => {
       sourceRef.current?.setRunning(running);
     },

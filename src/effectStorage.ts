@@ -19,9 +19,9 @@ export function loadEffectSettings(): EffectSettings {
 }
 
 export function saveEffectSettings(state: ControlState): void {
-  const { effect, running, speed, brightness, bpm } = state;
+  const { effect, running, speed, brightness, bpm, params } = state;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ effect, running, speed, brightness, bpm }));
+    localStorage.setItem(KEY, JSON.stringify({ effect, running, speed, brightness, bpm, params }));
   } catch (err) {
     console.warn(`[sim] ${KEY} not persisted:`, err);
   }
