@@ -1,4 +1,5 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
+import { beatSpike, ramp2, smoothstep, threshold, verticalFade, type RampPoint } from './stages';
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import type { ZoneId } from '../scene/zones';
@@ -35,16 +36,6 @@ export function createDemoEffectContext(): DemoEffectContext {
 const bell = (p: number) => Math.pow(Math.max(0, Math.cos(p * Math.PI)), 2);
 const wrap = (x: number) => ((x % 1) + 1) % 1;
 const band = (p: number) => 0.03 + 0.52 * bell(p);
-const smoothstep = (e0: number, e1: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
-// A 1→0 spike on every beat: instant attack on the kick, exponential decay with
-// time constant `decay` (seconds). `beat` is the beat clock in fractional beats.
-const beatSpike = (beat: number, bpm: number, decay: number) => {
-  const sinceBeatSec = (beat - Math.floor(beat)) * (60 / bpm);
-  return Math.exp(-sinceBeatSec / decay);
-};
 // Angular gap (radians) to the nearest arm of a two-armed axis through the origin:
 // folded into [0, π/2] so a direction and its opposite read identically.
 const axisGap = (a: number) => {
@@ -67,6 +58,12 @@ const PULSE_DEPTH = 0.05;
 const PULSE_DECAY = 0.07;
 // How far the pattern pops outward from the focus on each kick (fraction of scale).
 const PULSE_EXPAND = 0.1;
+// Blob color ramp: troughs → cores, plus the beat's lightness gain and the
+// height-driven hue tint layered on top.
+const NOISE_RAMP_START: RampPoint = { h: -0.2, s: 1, l: 0 };
+const NOISE_RAMP_END: RampPoint = { h: 0.05, s: 1, l: 0.5 };
+const NOISE_HEIGHT_HUE = -0.2;
+const NOISE_KICK_LIGHT = 0.2;
 // Feature count across the unit sphere the rays pierce. Smaller = fewer, broader shafts.
 const RAY_NOISE_SCALE = 3;
 const RAY_NOISE_DEPTH = 0.08; // zero means purely ignoring cathedral depth
@@ -335,14 +332,11 @@ export function createDemoEffects(
       const kick = beatSpike(beat, bpm, PULSE_DECAY);
       const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1 - PULSE_EXPAND * kick);
       const v = noise4D(sx, sy, sz, phase * NOISE_TIME);
-      const amt = smoothstep(
-        NOISE_THRESHOLD - NOISE_EDGE,
-        NOISE_THRESHOLD + NOISE_EDGE,
-        v - PULSE_DEPTH * kick,
-      );
-      const yoff = (1 - yn) * (1 - yn);
-      return [-0.2 + 0.25 * amt - yoff * 0.2, 1, (0.5 + 0.1 * kick) * amt];
+      const amt = threshold(v - PULSE_DEPTH * kick, { at: NOISE_THRESHOLD, edge: NOISE_EDGE });
+      const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
+      return [h + NOISE_HEIGHT_HUE * verticalFade(yn), s, l * (1 + NOISE_KICK_LIGHT * kick)];
     },
+
     'noise-rays': ({ xn, yn, zn, phase, beat, bpm }) => {
       const dx = Math.abs(xn - fx);
       const dy = yn - fy;
