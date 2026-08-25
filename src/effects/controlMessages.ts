@@ -59,6 +59,7 @@ export const effectResumeState = z.object({
   phase: z.number(),
   beat: z.number(),
   params: effectParams.optional(),
+  phases: z.record(z.string(), z.record(z.string(), z.number())).optional(),
 });
 export type EffectResumeState = z.infer<typeof effectResumeState>;
 

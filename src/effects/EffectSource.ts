@@ -83,6 +83,7 @@ export class EffectSource {
   private beat = 0;
   private beatNudge = 0;
   private readonly params: EffectParams = {};
+  private readonly phases: Record<string, Record<string, number>> = {};
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit, resume?: ResumeState) {
     this.pixels = pixels;
@@ -92,7 +93,11 @@ export class EffectSource {
     this.hsl = this.hslById[this.effectId];
 
     for (const [id, schema] of Object.entries(EFFECT_KNOBS)) {
-      if (schema) this.params[id] = defaultKnobValues(schema);
+      if (!schema) continue;
+      this.params[id] = defaultKnobValues(schema);
+      const acc: Record<string, number> = {};
+      for (const key in schema) if (schema[key].type === 'rate') acc[key] = 0;
+      if (Object.keys(acc).length) this.phases[id] = acc;
     }
 
     const length = new Map<number, number>();
@@ -133,6 +138,7 @@ export class EffectSource {
         phase: this.phase,
         beat: this.beat + this.beatNudge,
         params: this.params,
+        phases: this.phases,
       },
       context: this.context,
     };
@@ -153,6 +159,15 @@ export class EffectSource {
     this.beat = state.beat;
     this.beatNudge = 0;
     if (state.params) this.mergeParams(state.params);
+    if (state.phases) {
+      for (const [effect, acc] of Object.entries(state.phases)) {
+        const target = this.phases[effect];
+        if (!target) continue;
+        for (const [key, val] of Object.entries(acc)) {
+          if (key in target) target[key] = val;
+        }
+      }
+    }
   }
 
   private mergeParams(incoming: EffectParams): void {
@@ -230,6 +245,29 @@ export class EffectSource {
     }
   }
 
+  // Resolve the active effect's knobs for this frame: base + beat-kick, then
+  // integrate any rate knobs into their running phase (advanced by dt·speed) and
+  // expose that phase in place of the rate.
+  private resolveActiveKnobs(dt: number): ResolvedKnobs {
+    const schema = EFFECT_KNOBS[this.effectId];
+    if (!schema) return EMPTY_KNOBS;
+    const resolved = resolveKnobs(
+      schema,
+      this.params[this.effectId],
+      kickCurve(this.beat, this.bpm),
+    );
+    const acc = this.phases[this.effectId];
+    if (acc) {
+      for (const key in schema) {
+        if (schema[key].type === 'rate') {
+          acc[key] += resolved[key] * dt * this.speed;
+          resolved[key] = acc[key];
+        }
+      }
+    }
+    return resolved;
+  }
+
   renderFrame(dt: number): void {
     const advance = (dt * this.bpm) / 60;
     const ease = this.beatNudge * Math.min(1, advance);
@@ -246,10 +284,7 @@ export class EffectSource {
 
     const hsl = this.hsl;
     const brightness = this.brightness;
-    const schema = EFFECT_KNOBS[this.effectId];
-    const knobs = schema
-      ? resolveKnobs(schema, this.params[this.effectId], kickCurve(this.beat, this.bpm))
-      : EMPTY_KNOBS;
+    const knobs = this.resolveActiveKnobs(dt);
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const bytes = this.buffers.get(p.universe)!;

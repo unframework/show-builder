@@ -313,8 +313,9 @@ export const DEMO_EFFECTS = [
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
 
 const NOISE_KNOBS: KnobSchema = {
-  timeRate: {
+  time: {
     label: 'time',
+    type: 'rate',
     base: { min: 0, max: 2, step: 0.01 },
     kick: { min: -2, max: 2, step: 0.01 },
     default: { base: NOISE_TIME, kick: 0 },
@@ -360,12 +361,14 @@ const RAY_KNOBS: KnobSchema = {
   },
   rise: {
     label: 'scroll',
+    type: 'rate',
     base: { min: -6, max: 6, step: 0.05 },
     kick: { min: -4, max: 4, step: 0.05 },
     default: { base: NOISE_RISE, kick: 0 },
   },
-  timeRate: {
+  time: {
     label: 'time',
+    type: 'rate',
     base: { min: 0, max: 2, step: 0.01 },
     kick: { min: -2, max: 2, step: 0.01 },
     default: { base: NOISE_TIME, kick: 0 },
@@ -446,9 +449,9 @@ export function createDemoEffects(
         0.02 + 0.55 * b,
       ];
     },
-    noise: ({ xn, yn, zn, phase }, k) => {
+    noise: ({ xn, yn, zn }, k) => {
       const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
-      const v = noise4D(sx, sy, sz, phase * k.timeRate);
+      const v = noise4D(sx, sy, sz, k.time);
       const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
       const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
       return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
@@ -462,9 +465,9 @@ export function createDemoEffects(
       const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
       const v = noise4D(
         (dx / r) * k.zoom * detail,
-        (dy / r) * k.zoom - phase * k.rise,
+        (dy / r) * k.zoom - k.rise,
         (dz / r) * k.zoom,
-        phase * k.timeRate,
+        k.time,
       );
       const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
       const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);

@@ -14,8 +14,13 @@ export interface Range {
   step: number;
 }
 
+// 'rate' knobs are integrated into a running phase and expose that phase (not the
+// rate) to the effect, so changing the rate never jumps the phase; default 'value'.
+export type KnobType = 'value' | 'rate';
+
 export interface KnobDef {
   label: string;
+  type?: KnobType;
   base: Range;
   kick: Range;
   default: KnobValue;

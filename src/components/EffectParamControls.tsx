@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import type { EffectParams } from '../effects/controlMessages';
 import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
-import type { Range } from '../effects/knobs';
+import { kickCurve, type Range } from '../effects/knobs';
 
 // Pixels of travel before the drag axis locks; the lock point (not the initial
 // press) is the reference the value scrubs from.
@@ -55,16 +55,52 @@ function PenIcon() {
   );
 }
 
+// A white dot whose brightness rides a triangle wave, integrating the knob's rate
+// (base + beat-kick) client-side: 2s cycle at rate 1, sped up by the kick. Opacity
+// is written straight to the DOM to avoid a per-frame React render.
+function PulseDot({ rate, kickAmt, bpm }: { rate: number; kickAmt: number; bpm: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const live = useRef({ rate, kickAmt, bpm });
+  live.current = { rate, kickAmt, bpm };
+
+  useEffect(() => {
+    let raf = 0;
+    let last = 0;
+    let dotPhase = 0;
+    let beatClock = 0;
+    const tick = (ts: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = last ? (ts - last) / 1000 : 0;
+      last = ts;
+      const { rate, kickAmt, bpm } = live.current;
+      beatClock += (dt * bpm) / 60;
+      const resolved = rate + kickAmt * kickCurve(beatClock, bpm);
+      dotPhase += resolved * 0.5 * dt;
+      const f = dotPhase - Math.floor(dotPhase);
+      const tri = 1 - Math.abs(2 * f - 1);
+      if (ref.current) ref.current.style.opacity = String(0.12 + 0.88 * tri);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <span ref={ref} className="h-2 w-2 shrink-0 rounded-full bg-white" style={{ opacity: 0.12 }} />
+  );
+}
+
 // Tap-and-drag scrubber: press, move to lock an axis, then up/left increases and
 // down/right decreases. A full-window overlay draws the axis line + live delta.
 function ScrubValue({
   range,
   value,
   onChange,
+  clock,
 }: {
   range: Range;
   value: number;
   onChange: (v: number) => void;
+  clock?: { kickAmt: number; bpm: number };
 }) {
   const scrub = useRef<Scrub | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -139,6 +175,7 @@ function ScrubValue({
         onPointerUp={end}
         onPointerCancel={end}
       >
+        {clock && <PulseDot rate={value} kickAmt={clock.kickAmt} bpm={clock.bpm} />}
         <PenIcon />
         {fmt(shown)}
       </span>
@@ -201,6 +238,7 @@ function ScrubOverlay({ drag, fmt }: { drag: DragState; fmt: (v: number) => stri
 export function EffectParamControls({ source }: { source: EffectControl }) {
   const [effect, setEffect] = useState<DemoEffectId>('zone');
   const [params, setParams] = useState<EffectParams>({});
+  const [bpm, setBpm] = useState(120);
 
   useEffect(
     () =>
@@ -208,6 +246,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
         if (event.type !== 'state') return;
         setEffect(event.effect);
         setParams(event.params ?? {});
+        setBpm(event.bpm);
       }),
     [source],
   );
@@ -225,11 +264,17 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
             <div key={key} className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className="w-28 text-sm font-semibold uppercase tracking-wide opacity-60">
                 {def.label}
+                {def.type === 'rate' && (
+                  <span className="ml-1" title="clock rate">
+                    🕐
+                  </span>
+                )}
               </span>
               <ScrubValue
                 range={def.base}
                 value={v.base}
                 onChange={(x) => void source.setParam(effect, key, 'base', x)}
+                clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
               />
               <span className="text-sm uppercase tracking-wide opacity-40">kick</span>
               <ScrubValue
