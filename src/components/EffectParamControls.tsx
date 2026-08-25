@@ -12,6 +12,8 @@ const LOCK_PX = 6;
 const SCRUB_RANGE_PX = 300;
 // Perpendicular drift that arms cancel: release here reverts to the start value.
 const CANCEL_PERP_PX = 200;
+// Max gap between two taps to count as a double-tap (clears the knob to zero).
+const DOUBLE_TAP_MS = 300;
 
 type Axis = 'x' | 'y';
 
@@ -103,6 +105,7 @@ function ScrubValue({
   clock?: { kickAmt: number; bpm: number };
 }) {
   const scrub = useRef<Scrub | null>(null);
+  const lastTap = useRef(0);
   const [drag, setDrag] = useState<DragState | null>(null);
   const decimals = decimalsFor(range.step);
   const fmt = (v: number) => v.toFixed(decimals);
@@ -157,7 +160,17 @@ function ScrubValue({
   const end = () => {
     const s = scrub.current;
     scrub.current = null;
-    if (s?.cancel) onChange(s.startValue);
+    if (s?.cancel) {
+      onChange(s.startValue);
+    } else if (s && !s.axis) {
+      const now = performance.now();
+      if (now - lastTap.current < DOUBLE_TAP_MS) {
+        onChange(snap(0));
+        lastTap.current = 0;
+      } else {
+        lastTap.current = now;
+      }
+    }
     setDrag(null);
   };
 
