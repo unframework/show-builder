@@ -29,7 +29,7 @@ export function EffectControls({ source }: { source: EffectControl }) {
     bpm,
     commitBpm,
     <input
-      className="input input-lg input-bordered w-20"
+      className="input input-sm input-bordered w-20"
       type="number"
       min={30}
       max={300}
@@ -53,101 +53,96 @@ export function EffectControls({ source }: { source: EffectControl }) {
   );
 
   return (
-    <section className="max-h-[50dvh] shrink-0 overflow-y-auto bg-base-300 px-2 py-3 sm:px-4">
-      <div className="flex flex-wrap gap-4">
-        <div className="min-w-0 flex-1 basis-80">
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
-            <div className="inline-flex items-center gap-x-4">
-              <span className="text-base opacity-50">EFFECT</span>
-              <select
-                className="select select-lg select-bordered"
-                value={effect}
-                onChange={(e) => {
-                  const id = e.target.value as DemoEffectId;
-                  setEffect(id);
-                  void source.setEffect(id);
-                }}
-              >
-                {DEMO_EFFECTS.map((eff) => (
-                  <option key={eff.id} value={eff.id}>
-                    {eff.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="inline-flex items-center gap-x-4">
-              <span className="text-base opacity-50">SPEED</span>
-              <input
-                className="range range-lg range-warning w-32 sm:w-60"
-                type="range"
-                min={0.1}
-                max={3}
-                step={0.1}
-                value={speed}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  setSpeed(v);
-                  void source.setSpeed(v);
-                }}
-              />
-              <span className="input input-lg flex border border-base-content/10 bg-transparent w-16 items-center justify-center font-mono tabular-nums">
-                {speed.toFixed(1)}
-              </span>
-            </div>
-
-            <div className="inline-flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span key={beatFlash} className="beat-flash text-base opacity-50">
-                TEMPO
-              </span>
-              <button
-                className={clsx(
-                  'btn btn-lg relative overflow-visible',
-                  live ? 'btn-error' : 'btn-outline btn-warning',
-                )}
-                onPointerDown={() => {
-                  void source.cueBeat();
-                  tap(performance.now());
-                  setPulse((p) => p + 1);
-                }}
-              >
-                {pulse > 0 && (
-                  <span
-                    key={pulse}
-                    className="tap-pulse pointer-events-none absolute inset-0 rounded-[inherit] ring-2 ring-error"
-                  />
-                )}
-                TAP
-              </button>
-              {bpmField.editing ? (
-                <>
-                  {bpmField.input}
-                  <button className="btn btn-lg btn-primary" onClick={bpmField.submit}>
-                    OK
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    className="btn btn-lg btn-outline"
-                    onClick={() => applyBpm(Math.round(bpm))}
-                  >
-                    INT
-                  </button>
-                  <span className="input input-lg flex border border-base-content/10 bg-transparent w-20 items-center text-left font-mono tabular-nums">
-                    {bpm}
-                  </span>
-                  <button className="btn btn-lg btn-outline" onClick={bpmField.edit}>
-                    SET
-                  </button>
-                </>
-              )}
-              <span className="text-base opacity-50">BPM</span>
-            </div>
-          </div>
-        </div>
-        <div className="min-w-0 flex-1 basis-80" aria-hidden />
+    <>
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold uppercase tracking-wide opacity-60">EFFECT</span>
+        <select
+          className="select select-sm select-bordered w-full"
+          value={effect}
+          onChange={(e) => {
+            const id = e.target.value as DemoEffectId;
+            setEffect(id);
+            void source.setEffect(id);
+          }}
+        >
+          {DEMO_EFFECTS.map((eff) => (
+            <option key={eff.id} value={eff.id}>
+              {eff.label}
+            </option>
+          ))}
+        </select>
       </div>
-    </section>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-semibold uppercase tracking-wide opacity-60">SPEED</span>
+        <div className="flex items-center gap-2">
+          <input
+            className="range range-sm range-warning w-full min-w-0"
+            type="range"
+            min={0.1}
+            max={3}
+            step={0.1}
+            value={speed}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setSpeed(v);
+              void source.setSpeed(v);
+            }}
+          />
+          <span className="w-12 shrink-0 text-right font-mono text-sm tabular-nums opacity-80">
+            {speed.toFixed(1)}
+          </span>
+        </div>
+      </div>
+
+      <div className="col-span-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span
+          key={beatFlash}
+          className="beat-flash text-xs font-semibold uppercase tracking-wide opacity-60"
+        >
+          TEMPO
+        </span>
+        <button
+          className={clsx(
+            'btn btn-sm relative overflow-visible',
+            live ? 'btn-error' : 'btn-outline btn-warning',
+          )}
+          onPointerDown={() => {
+            void source.cueBeat();
+            tap(performance.now());
+            setPulse((p) => p + 1);
+          }}
+        >
+          {pulse > 0 && (
+            <span
+              key={pulse}
+              className="tap-pulse pointer-events-none absolute inset-0 rounded-[inherit] ring-2 ring-error"
+            />
+          )}
+          TAP
+        </button>
+        {bpmField.editing ? (
+          <>
+            {bpmField.input}
+            <button className="btn btn-sm btn-primary" onClick={bpmField.submit}>
+              OK
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-sm btn-outline" onClick={() => applyBpm(Math.round(bpm))}>
+              INT
+            </button>
+            <span className="input input-sm flex w-16 items-center border border-base-content/10 bg-transparent text-left font-mono tabular-nums">
+              {bpm}
+            </span>
+            <button className="btn btn-sm btn-outline" onClick={bpmField.edit}>
+              SET
+            </button>
+          </>
+        )}
+        <span className="text-xs font-semibold uppercase tracking-wide opacity-60">BPM</span>
+      </div>
+    </>
   );
 }

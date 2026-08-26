@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { BrightnessControl } from './components/BrightnessControl';
-import { EffectControls } from './components/EffectControls';
-import { EffectParamControls } from './components/EffectParamControls';
+import { EffectPanel } from './components/EffectPanel';
 import { HistoryControls } from './components/HistoryControls';
 import { RunToggle } from './components/RunToggle';
 import { Sidenav } from './components/Sidenav';
@@ -10,6 +9,23 @@ import { XmlModal } from './components/XmlModal';
 import { useEffectSource } from './useEffectSource';
 import { useEngine } from './useEngine';
 import { useRelay } from './relay/useRelay';
+
+function ResetViewIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
 
 export function App() {
   const [container, setContainer] = useState<HTMLElement | null>(null);
@@ -41,6 +57,17 @@ export function App() {
           onViewXml={setXmlName}
         />
         <div className="canvas-wrap relative flex-1 overflow-hidden" ref={setContainer}>
+          {engine && (
+            <button
+              type="button"
+              onClick={() => engine.resetView()}
+              className="btn btn-ghost btn-sm btn-square absolute right-2 top-2 z-10 bg-base-100/60 backdrop-blur"
+              title="Reset view"
+              aria-label="Reset view"
+            >
+              <ResetViewIcon />
+            </button>
+          )}
           <span className="pointer-events-none absolute bottom-2 left-1/2 z-10 hidden -translate-x-1/2 text-xs opacity-50 lg:inline">
             Drag to orbit · Scroll to zoom · Right-drag to pan · Double-click to reset view
           </span>
@@ -60,9 +87,8 @@ export function App() {
             !engine && <span className="loading loading-dots loading-lg text-base-content/50" />
           )}
         </div>
-        <div className="rounded-lg overflow-y-auto max-h-[35dvh]">
-          <EffectControls source={effectSource} />
-          <EffectParamControls source={effectSource} />
+        <div className="max-h-[55dvh] overflow-y-auto rounded-lg">
+          <EffectPanel source={effectSource} />
         </div>
       </div>
 

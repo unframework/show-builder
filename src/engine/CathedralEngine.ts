@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ROSE_CENTER_WORLD } from '../scene/build/roseWindow';
+import { clearCameraView, loadCameraView, saveCameraView, type CameraView } from '../cameraStorage';
 import type { Vec3 } from '../scene/coords';
 import type { PixelMap } from '../scene/pixelData';
 import { runBuilders } from '../scene/runBuilders';
@@ -31,6 +32,7 @@ const ROSE_PETAL_CHANNELS = 42;
 // Orbit pivot: biased toward the front façade (−Z) and near a standing observer's
 // eye level rather than mid-structure, so rotation feels grounded.
 const PIVOT: Vec3 = [0, 4, 0];
+const DEFAULT_VIEW: CameraView = { position: [-20, 18, -35], target: PIVOT };
 // Lens-shift the framing upward so the pivot sits below screen center, keeping the
 // spires in view without tilting the camera down.
 const VIEW_TOP_BIAS = 0.18;
@@ -69,16 +71,15 @@ export class CathedralEngine {
 
     const { clientWidth: w, clientHeight: h } = container;
     this.camera = new THREE.PerspectiveCamera(55, w / h || 1, 0.1, 500);
-    this.camera.position.set(-20, 18, -35);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(...PIVOT);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.minDistance = 5;
     this.controls.maxDistance = 200;
-    this.controls.update();
+    this.applyView(loadCameraView() ?? DEFAULT_VIEW);
 
+    this.controls.addEventListener('end', this.persistView);
     this.renderer.domElement.addEventListener('dblclick', this.resetView);
 
     const builder = new SceneBuilder();
@@ -146,16 +147,28 @@ export class CathedralEngine {
 
   dispose(): void {
     cancelAnimationFrame(this.frameHandle);
+    this.controls.removeEventListener('end', this.persistView);
     this.renderer.domElement.removeEventListener('dblclick', this.resetView);
     this.controls.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
 
-  private resetView = (): void => {
-    this.camera.position.set(0, 18, -35);
-    this.controls.target.set(...PIVOT);
+  resetView = (): void => {
+    clearCameraView();
+    this.applyView(DEFAULT_VIEW);
+  };
+
+  private applyView(view: CameraView): void {
+    this.camera.position.set(...view.position);
+    this.controls.target.set(...view.target);
     this.controls.update();
+  }
+
+  private persistView = (): void => {
+    const { x: px, y: py, z: pz } = this.camera.position;
+    const { x: tx, y: ty, z: tz } = this.controls.target;
+    saveCameraView({ position: [px, py, pz], target: [tx, ty, tz] });
   };
 
   private animate = (): void => {

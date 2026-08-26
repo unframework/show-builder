@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { CathedralEngine } from '../engine/CathedralEngine';
 import { ConnectionQualityChart } from './ConnectionQualityChart';
 import { SimControls } from './SimControls';
@@ -39,43 +40,61 @@ export function Toolbar({
   onToggleNav: () => void;
 }) {
   const controls = useSimControls(engine);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismiss = (e: Event) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   return (
-    <div className="navbar min-h-0 flex-wrap gap-3 border-b border-base-300 bg-base-200 px-2 py-2 sm:px-4">
+    <div className="navbar min-h-0 items-start gap-2 border-b border-base-300 bg-base-200 px-2 py-2 sm:px-4">
       <button
-        className="btn btn-ghost btn-sm btn-square lg:hidden"
+        className="btn btn-ghost btn-sm btn-square shrink-0 lg:hidden"
         onClick={onToggleNav}
         aria-label="Toggle sequence list"
       >
         ☰
       </button>
-      <SimSwitcher />
-      <div className="hidden items-center gap-3 lg:flex">
-        <Divider />
-        <SimControls controls={controls} />
-        <Divider />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        <SimSwitcher />
+        <div className="hidden items-center gap-3 lg:flex">
+          <Divider />
+          <SimControls controls={controls} />
+          <Divider />
+        </div>
+        {isLive && (
+          <span className="badge badge-success gap-1" title="Receiving live data from relay">
+            ● LIVE
+          </span>
+        )}
+        {connected && <ConnectionQualityChart flushStats={flushStats} />}
       </div>
-      {isLive && (
-        <span className="badge badge-success gap-1" title="Receiving live data from relay">
-          ● LIVE
-        </span>
-      )}
-      {connected && <ConnectionQualityChart flushStats={flushStats} />}
-      <div className="dropdown dropdown-end ml-auto lg:hidden">
-        <div
-          tabIndex={0}
-          role="button"
+      <div ref={menuRef} className="relative shrink-0 self-start lg:hidden">
+        <button
+          type="button"
           className="btn btn-ghost btn-sm btn-square"
           aria-label="Sim controls"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
         >
           <GearIcon />
-        </div>
-        <div
-          tabIndex={0}
-          className="dropdown-content z-30 mt-2 flex w-56 flex-col gap-3 rounded-box border border-base-300 bg-base-200 p-3 shadow-lg"
-        >
-          <SimControls controls={controls} />
-        </div>
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-full z-30 mt-2 flex w-56 flex-col gap-3 rounded-box border border-base-300 bg-base-200 p-3 shadow-lg">
+            <SimControls controls={controls} />
+          </div>
+        )}
       </div>
     </div>
   );

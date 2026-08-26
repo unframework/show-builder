@@ -40,11 +40,11 @@ interface Scrub {
 
 const decimalsFor = (step: number) => Math.min(3, Math.max(0, Math.ceil(-Math.log10(step))));
 
-function PenIcon() {
+function PenIcon({ size }: { size: 'sm' | 'md' }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-4 w-4 opacity-50"
+      className={clsx('opacity-50', size === 'sm' ? 'h-3 w-3' : 'h-4 w-4')}
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -98,11 +98,15 @@ function ScrubValue({
   value,
   onChange,
   clock,
+  size = 'md',
+  tag,
 }: {
   range: Range;
   value: number;
   onChange: (v: number) => void;
   clock?: { kickAmt: number; bpm: number };
+  size?: 'sm' | 'md';
+  tag?: string;
 }) {
   const scrub = useRef<Scrub | null>(null);
   const lastTap = useRef(0);
@@ -180,7 +184,10 @@ function ScrubValue({
     <>
       <span
         className={clsx(
-          'inline-flex min-w-[5rem] cursor-ns-resize touch-none select-none items-center justify-center gap-2 rounded-lg border-2 px-3 py-2 font-mono text-base font-semibold tabular-nums',
+          'inline-flex cursor-ns-resize touch-none select-none items-center justify-center rounded-lg border-2 font-mono font-semibold tabular-nums',
+          size === 'sm'
+            ? 'min-w-[3.5rem] gap-1 px-2 py-1 text-sm'
+            : 'min-w-[5rem] gap-2 px-3 py-2 text-base',
           drag?.cancel ? 'border-error text-error' : 'border-base-content/20 hover:border-warning',
         )}
         onPointerDown={onPointerDown}
@@ -189,7 +196,8 @@ function ScrubValue({
         onPointerCancel={end}
       >
         {clock && <PulseDot rate={value} kickAmt={clock.kickAmt} bpm={clock.bpm} />}
-        <PenIcon />
+        <PenIcon size={size} />
+        {tag && <span className="text-[0.6rem] leading-none opacity-40">{tag}</span>}
         {fmt(shown)}
       </span>
       {drag && <ScrubOverlay drag={drag} fmt={fmt} />}
@@ -269,36 +277,38 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
   const values = params[effect] ?? {};
 
   return (
-    <section className="bg-base-300 px-2 py-3 sm:px-4">
-      <div className="flex flex-col gap-2">
-        {Object.entries(schema).map(([key, def]) => {
-          const v = values[key] ?? def.default;
-          return (
-            <div key={key} className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="w-28 text-sm font-semibold uppercase tracking-wide opacity-60">
-                {def.label}
-                {def.type === 'rate' && (
-                  <span className="ml-1" title="clock rate">
-                    🕐
-                  </span>
-                )}
-              </span>
+    <>
+      {Object.entries(schema).map(([key, def]) => {
+        const v = values[key] ?? def.default;
+        return (
+          <div key={key} className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
+              {def.label}
+              {def.type === 'rate' && (
+                <span className="ml-1" title="clock rate">
+                  🕐
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-1">
               <ScrubValue
                 range={def.base}
                 value={v.base}
                 onChange={(x) => void source.setParam(effect, key, 'base', x)}
                 clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
+                size="sm"
               />
-              <span className="text-sm uppercase tracking-wide opacity-40">kick</span>
               <ScrubValue
                 range={def.kick}
                 value={v.kick}
                 onChange={(x) => void source.setParam(effect, key, 'kick', x)}
+                size="sm"
+                tag="k"
               />
             </div>
-          );
-        })}
-      </div>
-    </section>
+          </div>
+        );
+      })}
+    </>
   );
 }
