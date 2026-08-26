@@ -417,11 +417,78 @@ const RAY_KNOBS: KnobSchema = {
   },
 };
 
+const BUBBLE_KNOBS: KnobSchema = {
+  freq: {
+    label: 'density',
+    base: { min: 2, max: 30, step: 0.5 },
+    kick: { min: -10, max: 10, step: 0.5 },
+    default: { base: STRAND_FREQ, kick: 0 },
+  },
+  speed: {
+    label: 'rise',
+    type: 'rate',
+    base: { min: -3, max: 3, step: 0.01 },
+    kick: { min: -3, max: 3, step: 0.01 },
+    default: { base: STRAND_SPEED, kick: 0 },
+  },
+  time: {
+    label: 'morph',
+    type: 'rate',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: STRAND_TIME, kick: 0 },
+  },
+  threshold: {
+    label: 'threshold',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -0.75, max: 0.75, step: 0.01 },
+    default: { base: STRAND_THRESHOLD, kick: 0 },
+  },
+  edge: {
+    label: 'edge',
+    base: { min: 0.01, max: 0.5, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.01 },
+    default: { base: STRAND_EDGE, kick: 0 },
+  },
+  tint: {
+    label: 'tint',
+    base: { min: 0, max: 0.5, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.01 },
+    default: { base: STRAND_TINT, kick: 0 },
+  },
+  tipFade: {
+    label: 'tip fade',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: STRAND_TIP_FADE, kick: 0 },
+  },
+  breathe: {
+    label: 'breathe',
+    type: 'rate',
+    base: { min: 0, max: 1, step: 0.005 },
+    kick: { min: -1, max: 1, step: 0.005 },
+    default: { base: 1 / BREATHE_PERIOD, kick: 0 },
+  },
+  breatheDepth: {
+    label: 'breathe depth',
+    base: { min: 0, max: 2, step: 0.01 },
+    kick: { min: -2, max: 2, step: 0.01 },
+    default: { base: BREATHE_DEPTH, kick: 0 },
+  },
+  brightness: {
+    label: 'brightness',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: BUBBLE_L, kick: 0 },
+  },
+};
+
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
 // persisted per effect. Effects absent here have no knobs.
 export const EFFECT_KNOBS: Partial<Record<DemoEffectId, KnobSchema>> = {
   noise: NOISE_KNOBS,
   'noise-rays': RAY_KNOBS,
+  'rising-bubbles': BUBBLE_KNOBS,
 };
 
 export function createDemoEffects(
@@ -490,12 +557,11 @@ export function createDemoEffects(
         (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
       ];
     },
-    'rising-bubbles': ({ index, xn, yn, zn, phase }) => {
+    'rising-bubbles': ({ index, xn, yn, zn, phase }, k) => {
       const breathePhase = wrap(
-        phase / BREATHE_PERIOD +
-          BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
+        k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
       );
-      const breatheAdd = BREATHE_DEPTH * asymPulse(breathePhase, BREATHE_ATTACK);
+      const breatheAdd = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK);
 
       const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1);
       const bgV = noise4D(sx, sy, sz, phase * 0.1);
@@ -512,22 +578,14 @@ export function createDemoEffects(
       const t = strands.t[index];
       const h = strands.h[index];
       const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * h) - 0.2;
-      const v = h
-        ? noise4D(
-            sid * STRAND_SEP,
-            along * STRAND_FREQ - phase * STRAND_SPEED,
-            phase * STRAND_TIME,
-            0,
-          )
-        : 0;
-      const tipFade = 1 - STRAND_TIP_FADE * smoothstep(STRAND_TIP_START, 1, t);
-      const amt =
-        smoothstep(STRAND_THRESHOLD - STRAND_EDGE, STRAND_THRESHOLD + STRAND_EDGE, v) * tipFade;
-      const tint = (hashU(sid, 0, 1) - 0.5) * STRAND_TINT;
+      const v = h ? noise4D(sid * STRAND_SEP, along * k.freq - k.speed, k.time, 0) : 0;
+      const tipFade = 1 - k.tipFade * smoothstep(STRAND_TIP_START, 1, t);
+      const amt = smoothstep(k.threshold - k.edge, k.threshold + k.edge, v) * tipFade;
+      const tint = (hashU(sid, 0, 1) - 0.5) * k.tint;
       return [
         bgHue + tint * amt,
         BG_SAT * (1 - amt),
-        (bgL * (1 + breatheAdd * 3) + breatheAdd * 0.01) * (1 - amt) + BUBBLE_L * amt,
+        (bgL * (1 + breatheAdd * 3) + breatheAdd * 0.01) * (1 - amt) + k.brightness * amt,
       ];
     },
   };
