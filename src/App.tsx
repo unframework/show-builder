@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BrightnessControl } from './components/BrightnessControl';
 import { EffectControls } from './components/EffectControls';
 import { EffectParamControls } from './components/EffectParamControls';
+import { HistoryControls } from './components/HistoryControls';
 import { RunToggle } from './components/RunToggle';
 import { Sidenav } from './components/Sidenav';
 import { Toolbar } from './components/Toolbar';
@@ -46,8 +47,11 @@ export function App() {
         </div>
       </div>
       <div className="shrink-0 flex flex-col px-2 py-3 gap-4 border-t border-base-300 bg-base-200">
-        <div className="flex flex-wrap gap-8 items-center">
-          <h3 className="text-xs uppercase tracking-wide opacity-50 sm:px-4">Effects</h3>
+        <div className="flex flex-wrap gap-x-3 gap-y-2 sm:gap-8 items-center">
+          <h3 className="hidden text-xs uppercase tracking-wide opacity-50 sm:block sm:px-4">
+            Effects
+          </h3>
+          {engine && <HistoryControls source={effectSource} />}
           {engine && <RunToggle source={effectSource} size="sm" />}
           {engine && <BrightnessControl source={effectSource} size="sm" />}
           {error ? (

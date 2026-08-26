@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EffectEvent } from './effects/controlMessages';
 import type { CathedralEngine } from './engine/CathedralEngine';
 import { applyEffectSettings, EffectSource, type ResumeState } from './effects/EffectSource';
@@ -72,31 +72,36 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
     return () => cancelAnimationFrame(frame);
   }, [engine, isLive]);
 
-  return {
-    setEffect: async (id) => {
-      sourceRef.current?.setEffect(id);
-    },
-    setSpeed: async (speed) => {
-      sourceRef.current?.setSpeed(speed);
-    },
-    setBrightness: async (brightness) => {
-      sourceRef.current?.setBrightness(brightness);
-    },
-    setBpm: async (bpm) => {
-      sourceRef.current?.setBpm(bpm);
-    },
-    setParam: async (effect, key, field, value) => {
-      sourceRef.current?.setParam(effect, key, field, value);
-    },
-    setRunning: async (running) => {
-      sourceRef.current?.setRunning(running);
-    },
-    cueBeat: async () => {
-      sourceRef.current?.cueBeat();
-    },
-    subscribe: (listener) => {
-      listenersRef.current.add(listener);
-      return () => listenersRef.current.delete(listener);
-    },
-  };
+  // Stable identity across renders: methods read the live source via refs, so a
+  // single adapter survives engine rebuilds and lets consumers key effects on it.
+  return useMemo<EffectControl>(
+    () => ({
+      setEffect: async (id) => {
+        sourceRef.current?.setEffect(id);
+      },
+      setSpeed: async (speed) => {
+        sourceRef.current?.setSpeed(speed);
+      },
+      setBrightness: async (brightness) => {
+        sourceRef.current?.setBrightness(brightness);
+      },
+      setBpm: async (bpm) => {
+        sourceRef.current?.setBpm(bpm);
+      },
+      setParam: async (effect, key, field, value) => {
+        sourceRef.current?.setParam(effect, key, field, value);
+      },
+      setRunning: async (running) => {
+        sourceRef.current?.setRunning(running);
+      },
+      cueBeat: async () => {
+        sourceRef.current?.cueBeat();
+      },
+      subscribe: (listener) => {
+        listenersRef.current.add(listener);
+        return () => listenersRef.current.delete(listener);
+      },
+    }),
+    [],
+  );
 }
