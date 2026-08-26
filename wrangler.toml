@@ -1,0 +1,8 @@
+name = "gothic-folly-runner"
+
+# R2 bucket that holds the runner bundle uploaded by deploy/upload-bundle.sh.
+# Public download URL (used by deploy/pull-install.sh on the Pi) is enabled once with:
+#   npx wrangler r2 bucket dev-url enable gothic-folly-runner
+[[r2_buckets]]
+binding = "BUNDLE"
+bucket_name = "gothic-folly-runner"

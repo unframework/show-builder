@@ -12,11 +12,14 @@
     "runner": "tsx src/runner/index.ts",
     "build": "tsc -b && vite build",
     "build:runner": "node scripts/build-runner.mjs",
+    "deploy:r2": "bash deploy/upload-bundle.sh",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -28,24 +31,37 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/ws": "^8.5.13",
-    "tsx": "^4.19.2",
+    "@chromatic-com/storybook": "latest",
     "@eslint/js": "^9.17.0",
+    "@storybook/addon-a11y": "^10.5.10",
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/addon-mcp": "latest",
+    "@storybook/addon-vitest": "^10.5.10",
+    "@storybook/react-vite": "^10.5.10",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.10.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@types/three": "^0.171.0",
+    "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/browser-playwright": "latest",
+    "@vitest/coverage-v8": "latest",
     "daisyui": "^5.7.19",
     "esbuild": "^0.25.0",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
+    "eslint-plugin-storybook": "^10.5.10",
+    "playwright": "latest",
     "prettier": "^3.4.2",
+    "storybook": "^10.5.10",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vitest": "latest",
+    "wrangler": "^4.125.0"
   }
 }

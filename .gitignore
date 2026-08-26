@@ -8,6 +8,7 @@ node_modules/
 # Vite build output
 dist/
 dist-runner/
+dist-runner.tar.gz
 
 # Runner persisted settings (dev fallback dir)
 .runner-state/
@@ -24,3 +25,6 @@ xlights/xLights_dbgrpt-*.zip
 
 # Python
 td/__pycache__/
+
+*storybook.log
+storybook-static
