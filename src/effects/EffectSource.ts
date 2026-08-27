@@ -19,7 +19,7 @@ import {
 } from './demoEffects';
 import { defaultKnobValues, kickCurve, resolveKnobs, type ResolvedKnobs } from './knobs';
 
-type Emit = (universe: number, bytes: Uint8Array) => void;
+export type FrameSink = (universe: number, rgb: Float64Array, brightness: number) => void;
 type Listener = (event: EffectEvent) => void;
 
 // Seed a live source from persisted knobs; running is applied last so its
@@ -32,8 +32,6 @@ export function applyEffectSettings(source: EffectSource, settings: EffectSettin
   if (settings.params) source.setParams(settings.params);
   if (settings.running !== undefined) source.setRunning(settings.running);
 }
-
-const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v * 255)));
 
 const EMPTY_KNOBS: ResolvedKnobs = {};
 
@@ -62,13 +60,14 @@ export interface ResumeState {
 }
 
 // Procedural frame source: the effect analogue of the relay. Iterates every
-// pixel, evaluates the selected effect at the current phase, packs the result
-// into 8-bit DMX universe buffers, and pushes them through the same ingest the
-// relay uses. Environment-agnostic: a driver advances it via `renderFrame`.
+// pixel, evaluates the selected effect at the current phase, and emits a
+// per-universe float RGB buffer plus the master brightness. Brightness and 8-bit
+// quantization happen downstream in the output stage. Environment-agnostic: a
+// driver advances it via `renderFrame`.
 export class EffectSource {
   private readonly pixels: PixelDescriptor[];
-  private readonly emit: Emit;
-  private readonly buffers = new Map<number, Uint8Array>();
+  private readonly emit: FrameSink;
+  private readonly buffers = new Map<number, Float64Array>();
   private readonly listeners = new Set<Listener>();
   private readonly context: DemoEffectContext;
   private readonly hslById: Record<DemoEffectId, DemoEffect['hsl']>;
@@ -85,7 +84,7 @@ export class EffectSource {
   private readonly params: EffectParams = {};
   private readonly phases: Record<string, Record<string, number>> = {};
 
-  constructor(pixels: PixelDescriptor[], focus: Vec3, emit: Emit, resume?: ResumeState) {
+  constructor(pixels: PixelDescriptor[], focus: Vec3, emit: FrameSink, resume?: ResumeState) {
     this.pixels = pixels;
     this.emit = emit;
     this.context = resume?.context ?? createDemoEffectContext();
@@ -105,7 +104,7 @@ export class EffectSource {
       const need = p.ch0 + 3;
       length.set(p.universe, Math.max(length.get(p.universe) ?? 0, need));
     }
-    for (const [universe, len] of length) this.buffers.set(universe, new Uint8Array(len));
+    for (const [universe, len] of length) this.buffers.set(universe, new Float64Array(len));
 
     if (resume?.snapshot !== undefined) this.restore(resume.snapshot);
   }
@@ -283,15 +282,14 @@ export class EffectSource {
     this.phase += dt * this.speed;
 
     const hsl = this.hsl;
-    const brightness = this.brightness;
     const knobs = this.resolveActiveKnobs(dt);
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
-      const bytes = this.buffers.get(p.universe)!;
+      const buf = this.buffers.get(p.universe)!;
       if (!hsl) {
-        bytes[p.ch0] = clampByte(p.base[0] * brightness);
-        bytes[p.ch0 + 1] = clampByte(p.base[1] * brightness);
-        bytes[p.ch0 + 2] = clampByte(p.base[2] * brightness);
+        buf[p.ch0] = p.base[0];
+        buf[p.ch0 + 1] = p.base[1];
+        buf[p.ch0 + 2] = p.base[2];
         continue;
       }
       const [h, s, l] = hsl(
@@ -308,11 +306,11 @@ export class EffectSource {
         knobs,
       );
       const [r, g, b] = hslToRgb(h, s, l);
-      bytes[p.ch0] = clampByte(r * brightness);
-      bytes[p.ch0 + 1] = clampByte(g * brightness);
-      bytes[p.ch0 + 2] = clampByte(b * brightness);
+      buf[p.ch0] = r;
+      buf[p.ch0 + 1] = g;
+      buf[p.ch0 + 2] = b;
     }
 
-    for (const [universe, bytes] of this.buffers) this.emit(universe, bytes);
+    for (const [universe, buf] of this.buffers) this.emit(universe, buf, this.brightness);
   }
 }

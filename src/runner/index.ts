@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEffectSettings, EffectSource } from '../effects/EffectSource';
+import { toRgbBytes } from '../effects/frameOutput';
 import { SacnOutput } from '../relay/e131';
 import { ROSE_CENTER_WORLD } from '../scene/build/roseWindow';
 import type { Vec3 } from '../scene/coords';
@@ -118,7 +119,7 @@ async function main(): Promise<void> {
   const source = new EffectSource(
     pixels,
     focus,
-    expander ? expander.wrap(output.emit) : output.emit,
+    toRgbBytes(expander ? expander.wrap(output.emit) : output.emit),
   );
   applyEffectSettings(source, saved);
 

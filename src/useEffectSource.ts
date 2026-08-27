@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EffectEvent } from './effects/controlMessages';
 import type { CathedralEngine } from './engine/CathedralEngine';
 import { applyEffectSettings, EffectSource, type ResumeState } from './effects/EffectSource';
+import { toRgbBytes } from './effects/frameOutput';
 import type { EffectControl } from './effects/effectControl';
 import { loadEffectSettings, saveEffectSettings } from './effectStorage';
 
@@ -41,7 +42,7 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
     const source = new ActiveEffectSource(
       engine.getPixels(),
       engine.getFocus(),
-      (u, bytes) => engine.applyUniverse(u, bytes),
+      toRgbBytes((u, bytes) => engine.applyUniverse(u, bytes)),
       resume,
     );
     const unsubscribe = source.subscribe((event) => {
