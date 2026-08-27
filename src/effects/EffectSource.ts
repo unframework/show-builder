@@ -1,6 +1,5 @@
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
-import { hslToRgb } from './color';
 import {
   effectResumeState,
   type ControlState,
@@ -13,10 +12,10 @@ import {
   createDemoEffectContext,
   createDemoEffects,
   EFFECT_KNOBS,
-  type DemoEffect,
   type DemoEffectContext,
   type DemoEffectId,
 } from './demoEffects';
+import { paintLayers, type Layer } from './layers';
 import { defaultKnobValues, kickCurve, resolveKnobs, type ResolvedKnobs } from './knobs';
 
 export type FrameSink = (universe: number, rgb: Float64Array, brightness: number) => void;
@@ -70,9 +69,9 @@ export class EffectSource {
   private readonly buffers = new Map<number, Float64Array>();
   private readonly listeners = new Set<Listener>();
   private readonly context: DemoEffectContext;
-  private readonly hslById: Record<DemoEffectId, DemoEffect['hsl']>;
+  private readonly layersById: Record<DemoEffectId, Layer[] | undefined>;
 
-  private hsl: DemoEffect['hsl'];
+  private layers: Layer[] | undefined;
   private effectId: DemoEffectId = 'zone';
   private running = true;
   private speed = 1;
@@ -88,8 +87,8 @@ export class EffectSource {
     this.pixels = pixels;
     this.emit = emit;
     this.context = resume?.context ?? createDemoEffectContext();
-    this.hslById = createDemoEffects(this.context, pixels, focus);
-    this.hsl = this.hslById[this.effectId];
+    this.layersById = createDemoEffects(this.context, pixels, focus);
+    this.layers = this.layersById[this.effectId];
 
     for (const [id, schema] of Object.entries(EFFECT_KNOBS)) {
       if (!schema) continue;
@@ -149,7 +148,7 @@ export class EffectSource {
     const state = parsed.data;
 
     this.effectId = state.effect;
-    this.hsl = this.hslById[state.effect];
+    this.layers = this.layersById[state.effect];
     this.running = state.running;
     this.speed = state.speed;
     this.brightness = state.brightness;
@@ -187,7 +186,7 @@ export class EffectSource {
     if (id === this.effectId) return;
 
     this.effectId = id;
-    this.hsl = this.hslById[id];
+    this.layers = this.layersById[id];
     this.notify(this.getState());
   }
 
@@ -281,18 +280,21 @@ export class EffectSource {
 
     this.phase += dt * this.speed;
 
-    const hsl = this.hsl;
+    const layers = this.layers;
     const knobs = this.resolveActiveKnobs(dt);
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const buf = this.buffers.get(p.universe)!;
-      if (!hsl) {
+      if (!layers) {
         buf[p.ch0] = p.base[0];
         buf[p.ch0 + 1] = p.base[1];
         buf[p.ch0 + 2] = p.base[2];
         continue;
       }
-      const [h, s, l] = hsl(
+      paintLayers(
+        buf,
+        p.ch0,
+        layers,
         {
           xn: p.xn,
           yn: p.yn,
@@ -305,10 +307,6 @@ export class EffectSource {
         },
         knobs,
       );
-      const [r, g, b] = hslToRgb(h, s, l);
-      buf[p.ch0] = r;
-      buf[p.ch0 + 1] = g;
-      buf[p.ch0 + 2] = b;
     }
 
     for (const [universe, buf] of this.buffers) this.emit(universe, buf, this.brightness);

@@ -1,4 +1,5 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
+import type { Layer } from './layers';
 import { beatSpike, ramp2, smoothstep, threshold, verticalFade, type RampPoint } from './stages';
 import { type KnobSchema, type ResolvedKnobs } from './knobs';
 import type { Vec3 } from '../scene/coords';
@@ -17,13 +18,17 @@ export interface EffectInput {
   twinkleOffset: number;
 }
 
-// HSL for a pixel given its normalized position and the animation phase.
-// A `hsl`-less effect ("zone") paints each pixel its fixed zone color instead.
-export interface DemoEffect {
-  id: DemoEffectId;
-  label: string;
-  hsl?: (input: EffectInput, knobs: ResolvedKnobs) => [number, number, number];
-}
+type Paint = (input: EffectInput, knobs: ResolvedKnobs) => [number, number, number];
+
+// The common case: one fully opaque layer that owns the whole pixel. An effect
+// with no layers ("zone") paints each pixel its fixed zone color instead.
+const solid = (paint: Paint): Layer => ({
+  blend: 'over',
+  paint: (input, knobs) => {
+    const [h, s, l] = paint(input, knobs);
+    return [h, s, l, 1];
+  },
+});
 
 // stable stuff reused across hot-reloads
 export interface DemoEffectContext {
@@ -146,6 +151,9 @@ const BREATHE_SEED = 41;
 const BG_SAT = 0.7;
 const BG_MAX = 0.15; // peak faint-blue lightness at the crown
 const BUBBLE_L = 0.95;
+// The bubble layer's own near-white core; a faint per-strand tint rides the hue.
+const BUBBLE_HUE = 0.68;
+const BUBBLE_SAT = 0.12;
 
 // Stateless integer hash → [0,1), decorrelated between neighboring inputs.
 const hashU = (a: number, b: number, c: number) => {
@@ -495,98 +503,111 @@ export function createDemoEffects(
   { noise4D }: DemoEffectContext,
   pixels: PixelDescriptor[],
   focus: Vec3,
-): Record<DemoEffectId, DemoEffect['hsl'] | undefined> {
+): Record<DemoEffectId, Layer[] | undefined> {
   const [fx, fy, fz] = focus;
   const rings = ringField(pixels, focus);
   const strands = strandField(pixels);
   return {
     zone: undefined,
-    'lr-sweep': ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))],
-    rise: ({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))],
-    'fb-sweep': ({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))],
-    radial: ({ xn, zn, phase }) => {
-      const d = Math.hypot(xn - 0.5, zn - 0.5) * Math.SQRT2;
-      return [0.87, 0.9, band(wrap(d - phase * 0.25))];
-    },
-    twinkle: ({ phase, twinkleOffset }) => {
-      const b = Math.pow(0.5 + 0.5 * Math.sin(phase * 2.5 + twinkleOffset), 3);
-      return [
-        0.06 + 0.06 * Math.sin(twinkleOffset * 5),
-        0.75 + 0.25 * Math.cos(twinkleOffset * 3),
-        0.02 + 0.55 * b,
-      ];
-    },
-    noise: ({ xn, yn, zn }, k) => {
-      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
-      const v = noise4D(sx, sy, sz, k.time);
-      const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-      const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
-      return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
-    },
+    'lr-sweep': [solid(({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))])],
+    rise: [solid(({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))])],
+    'fb-sweep': [solid(({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))])],
+    radial: [
+      solid(({ xn, zn, phase }) => {
+        const d = Math.hypot(xn - 0.5, zn - 0.5) * Math.SQRT2;
+        return [0.87, 0.9, band(wrap(d - phase * 0.25))];
+      }),
+    ],
+    twinkle: [
+      solid(({ phase, twinkleOffset }) => {
+        const b = Math.pow(0.5 + 0.5 * Math.sin(phase * 2.5 + twinkleOffset), 3);
+        return [
+          0.06 + 0.06 * Math.sin(twinkleOffset * 5),
+          0.75 + 0.25 * Math.cos(twinkleOffset * 3),
+          0.02 + 0.55 * b,
+        ];
+      }),
+    ],
+    noise: [
+      solid(({ xn, yn, zn }, k) => {
+        const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
+        const v = noise4D(sx, sy, sz, k.time);
+        const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+        const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
+        return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
+      }),
+    ],
+    'noise-rays': [
+      solid(({ xn, yn, zn, phase }, k) => {
+        const dx = Math.abs(xn - fx);
+        const dy = yn - fy;
+        const dz = (zn - fz) * k.depth;
+        const r = Math.hypot(dx, dy, dz) || 1;
+        const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
+        const v = noise4D(
+          (dx / r) * k.zoom * detail,
+          (dy / r) * k.zoom - k.rise,
+          (dz / r) * k.zoom,
+          k.time,
+        );
+        const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+        const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);
+        return [
+          h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
+          s,
+          l * k.lightGain,
+        ];
+      }),
+    ],
+    rings: [
+      solid(({ index, phase, beat, bpm }) => {
+        const { r, fade, angle } = rings[index];
+        const kick = beatSpike(beat, bpm, PULSE_DECAY);
+        const crest = bell(wrap(r * RING_FREQ - phase * RING_SPEED - kick * RING_EXPAND));
 
-    'noise-rays': ({ xn, yn, zn, phase }, k) => {
-      const dx = Math.abs(xn - fx);
-      const dy = yn - fy;
-      const dz = (zn - fz) * k.depth;
-      const r = Math.hypot(dx, dy, dz) || 1;
-      const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
-      const v = noise4D(
-        (dx / r) * k.zoom * detail,
-        (dy / r) * k.zoom - k.rise,
-        (dz / r) * k.zoom,
-        k.time,
-      );
-      const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-      const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);
-      return [
-        h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
-        s,
-        l * k.lightGain,
-      ];
-    },
-    rings: ({ index, phase, beat, bpm }) => {
-      const { r, fade, angle } = rings[index];
-      const kick = beatSpike(beat, bpm, PULSE_DECAY);
-      const crest = bell(wrap(r * RING_FREQ - phase * RING_SPEED - kick * RING_EXPAND));
+        const beam = 1 - smoothstep(0, SEARCH_WIDTH, axisGap(angle - (beat - 0.55) * SEARCH_SPEED));
 
-      const beam = 1 - smoothstep(0, SEARCH_WIDTH, axisGap(angle - (beat - 0.55) * SEARCH_SPEED));
-
-      return [
-        0.37 + 0.09 * crest + 0.08 * Math.sin(phase * 0.3) + 0.1 * beam,
-        0.9 - 0.2 * beam,
-        (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
-      ];
-    },
-    'rising-bubbles': ({ index, xn, yn, zn, phase }, k) => {
-      const breathePhase = wrap(
-        k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
-      );
-      const breatheAdd = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK);
-
-      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1);
-      const bgV = noise4D(sx, sy, sz, phase * 0.1);
-      const bgAmt = smoothstep(0.1 - 0.15, 0.1 + 0.15, bgV - breatheAdd * 0.2);
-      const yoff = (1 - yn) * (1 - yn);
-      const bgHue = 0.65 + 0.08 * bgAmt + 0.1 * yoff;
-      const bgL = BG_MAX * 0.5 + 0.5 * BG_MAX * bgAmt;
-
-      const sid = strands.id[index];
-      if (sid < 0) {
-        return [bgHue + 0.15, BG_SAT, 0.2 + bgL * (1 + breatheAdd * 3)];
-      }
-
-      const t = strands.t[index];
-      const h = strands.h[index];
-      const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * h) - 0.2;
-      const v = h ? noise4D(sid * STRAND_SEP, along * k.freq - k.speed, k.time, 0) : 0;
-      const tipFade = 1 - k.tipFade * smoothstep(STRAND_TIP_START, 1, t);
-      const amt = smoothstep(k.threshold - k.edge, k.threshold + k.edge, v) * tipFade;
-      const tint = (hashU(sid, 0, 1) - 0.5) * k.tint;
-      return [
-        bgHue + tint * amt,
-        BG_SAT * (1 - amt),
-        (bgL * (1 + breatheAdd * 3) + breatheAdd * 0.01) * (1 - amt) + k.brightness * amt,
-      ];
-    },
+        return [
+          0.37 + 0.09 * crest + 0.08 * Math.sin(phase * 0.3) + 0.1 * beam,
+          0.9 - 0.2 * beam,
+          (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
+        ];
+      }),
+    ],
+    // Two stacked layers: a slow breathing foundation wash, and the rising blobs
+    // composited over it — the blobs displace the wash where they cover (amt).
+    'rising-bubbles': [
+      {
+        blend: 'over',
+        paint: ({ xn, yn, zn, phase }, k) => {
+          const breathePhase = wrap(
+            k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
+          );
+          const breatheAdd = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK);
+          const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1);
+          const bgV = noise4D(sx, sy, sz, phase * 0.1);
+          const bgAmt = smoothstep(0.1 - 0.15, 0.1 + 0.15, bgV - breatheAdd * 0.2);
+          const yoff = (1 - yn) * (1 - yn);
+          const bgHue = 0.65 + 0.08 * bgAmt + 0.1 * yoff;
+          const bgL = BG_MAX * 0.5 + 0.5 * BG_MAX * bgAmt;
+          return [bgHue + 0.15, BG_SAT, 0.2 + bgL * (1 + breatheAdd * 3), 1];
+        },
+      },
+      {
+        blend: 'over',
+        paint: ({ index }, k) => {
+          const sid = strands.id[index];
+          if (sid < 0) return [0, 0, 0, 0];
+          const t = strands.t[index];
+          const h = strands.h[index];
+          const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * h) - 0.2;
+          const v = h ? noise4D(sid * STRAND_SEP, along * k.freq - k.speed, k.time, 0) : 0;
+          const tipFade = 1 - k.tipFade * smoothstep(STRAND_TIP_START, 1, t);
+          const amt = smoothstep(k.threshold - k.edge, k.threshold + k.edge, v) * tipFade;
+          const tint = (hashU(sid, 0, 1) - 0.5) * k.tint;
+          return [BUBBLE_HUE + tint, BUBBLE_SAT, k.brightness, amt];
+        },
+      },
+    ],
   };
 }
