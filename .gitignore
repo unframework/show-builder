@@ -8,7 +8,7 @@ node_modules/
 # Vite build output
 dist/
 dist-runner/
-dist-runner.tar.gz
+dist-pages/
 
 # Runner persisted settings (dev fallback dir)
 .runner-state/

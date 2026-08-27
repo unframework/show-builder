@@ -10,37 +10,54 @@ it in the 3D sim, or point it at the real hardware.
 - `npm run build:runner` — bundle a dependency-free `dist-runner/` (server + UI +
   pixel-map); copy to any host and run `node start.mjs`.
 
-## Deploy to a Raspberry Pi kiosk (manual, via Cloudflare R2)
+## Deploy to a Raspberry Pi kiosk (manual, via Cloudflare Pages)
 
-For when the Pi isn't on the dev machine's LAN. The bundle is uploaded to an R2
-bucket, then pulled onto the Pi.
+For when the Pi isn't on the dev machine's LAN. The bundle is published to a
+Cloudflare Pages project (free, no billing) and pulled onto the Pi over HTTPS.
 
 One-time setup (dev machine):
 
 ```bash
 npm install                                                 # installs wrangler
-npx wrangler login                                          # browser OAuth
-npx wrangler r2 bucket create gothic-folly-runner
-npx wrangler r2 bucket dev-url enable gothic-folly-runner   # → public pub-xxxx.r2.dev URL
+npx wrangler login --device                                 # device-code OAuth (works headless/SSH)
+npx wrangler pages project create gothic-folly-runner --production-branch main
 ```
 
 Then per deploy:
 
 ```bash
-npm run deploy:r2                                           # build + upload bundle to R2
+npm run deploy:pages                                        # build + publish bundle to Pages
 ```
+
+The bundle lands at
+`https://gothic-folly-runner.pages.dev/gothic-folly-runner-latest.tar.gz`.
 
 On the Pi (copy `deploy/pull-install.sh` there once; the systemd unit is assumed
 already installed):
 
 ```bash
-RUNNER_BUNDLE_URL=https://pub-xxxx.r2.dev/gothic-folly-runner-latest.tar.gz ./pull-install.sh
+./pull-install.sh
 ```
 
-`pull-install.sh` downloads the bundle into `/opt/gothic-folly-runner` and restarts
+`pull-install.sh` downloads that URL into `/opt/gothic-folly-runner` and restarts
 the service; the persisted state at `/var/lib/gothic-folly-runner/` is untouched.
+Override the source with `RUNNER_BUNDLE_URL`, or the project/key on the dev side
+with `CF_PROJECT` / `BUNDLE_KEY`.
 
-Override the bucket/key with `R2_BUCKET` / `R2_KEY` env vars if needed.
+## Remote sim demo (Cloudflare Pages)
+
+To poke at the 3D cathedral sim from anywhere (demo mode — no live sACN), publish
+the browser app to its own Pages project:
+
+```bash
+npm run deploy:sim                                         # build + publish the sim UI
+```
+
+Live at `https://gothic-folly-sim.pages.dev/` (root serves the cathedral view). It
+runs without the relay: pixel-map geometry loads from the wiki copy over CORS, and
+the missing `localhost:3001` relay just leaves it in demo mode. One-time project
+setup mirrors the runner: `npx wrangler pages project create gothic-folly-sim
+--production-branch main`. Override the project with `CF_SIM_PROJECT`.
 
 ### Legacy LAN deploy
 

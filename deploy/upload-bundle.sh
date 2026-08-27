@@ -1,27 +1,31 @@
 #!/usr/bin/env bash
-# Build the runner bundle and upload it to Cloudflare R2 for manual Pi install.
+# Build the runner bundle and publish it to Cloudflare Pages for manual Pi install.
 #
 # One-time setup:
 #   npm install
-#   npx wrangler login
-#   npx wrangler r2 bucket create "$R2_BUCKET"
-#   npx wrangler r2 bucket dev-url enable "$R2_BUCKET"   # → public pub-xxxx.r2.dev URL
+#   npx wrangler login --device            # RFC 8628 device flow (works over SSH/headless)
+#   npx wrangler pages project create gothic-folly-runner --production-branch main
 #
 # Per deploy: run this, then on the Pi run deploy/pull-install.sh.
+# The bundle lands at https://<project>.pages.dev/<key>.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-R2_BUCKET="${R2_BUCKET:-gothic-folly-runner}"
-R2_KEY="${R2_KEY:-gothic-folly-runner-latest.tar.gz}"
-ARCHIVE="$REPO/dist-runner.tar.gz"
+CF_PROJECT="${CF_PROJECT:-gothic-folly-runner}"
+BUNDLE_KEY="${BUNDLE_KEY:-gothic-folly-runner-latest.tar.gz}"
+STAGE="$REPO/dist-pages"
 
 echo "==> Building runner bundle"
 npm --prefix "$REPO" run build:runner
 
-echo "==> Archiving dist-runner/ → $ARCHIVE"
-tar -czf "$ARCHIVE" -C "$REPO/dist-runner" .
+echo "==> Staging archive → $STAGE/$BUNDLE_KEY"
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+tar -czf "$STAGE/$BUNDLE_KEY" -C "$REPO/dist-runner" .
 
-echo "==> Uploading to R2: $R2_BUCKET/$R2_KEY"
-npx --prefix "$REPO" wrangler r2 object put "$R2_BUCKET/$R2_KEY" --file "$ARCHIVE" --remote
+echo "==> Deploying to Cloudflare Pages project $CF_PROJECT"
+npx --prefix "$REPO" wrangler pages deploy "$STAGE" \
+  --project-name "$CF_PROJECT" --branch main --commit-dirty=true
 
-echo "==> Done. On the Pi: RUNNER_BUNDLE_URL=<r2.dev url> ./pull-install.sh"
+echo "==> Done. Bundle: https://$CF_PROJECT.pages.dev/$BUNDLE_KEY"
+echo "    On the Pi: ./pull-install.sh (or override RUNNER_BUNDLE_URL)"

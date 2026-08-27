@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# Pull the latest runner bundle from R2 and install it into the kiosk. Run on the Pi.
+# Pull the latest runner bundle from Cloudflare Pages and install it. Run on the Pi.
 #
-#   RUNNER_BUNDLE_URL=https://pub-xxxx.r2.dev/gothic-folly-runner-latest.tar.gz ./pull-install.sh
+#   ./pull-install.sh
+#   RUNNER_BUNDLE_URL=https://gothic-folly-runner.pages.dev/gothic-folly-runner-latest.tar.gz ./pull-install.sh
 #
 # The systemd unit (deploy/gothic-folly-runner.service) and the persisted state at
 # /var/lib/gothic-folly-runner/ are left untouched. Extraction overlays files without
 # pruning, so a renamed asset from a prior build could linger — harmless for this bundle.
 set -euo pipefail
 
-URL="${RUNNER_BUNDLE_URL:?set RUNNER_BUNDLE_URL to the R2 public bundle URL}"
+URL="${RUNNER_BUNDLE_URL:-https://gothic-folly-runner.pages.dev/gothic-folly-runner-latest.tar.gz}"
 DEST="${DEST:-/opt/gothic-folly-runner}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "==> Downloading bundle"
+echo "==> Downloading $URL"
 curl -fsSL "$URL" -o "$TMP/bundle.tar.gz"
 
 echo "==> Extracting into $DEST"

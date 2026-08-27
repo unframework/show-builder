@@ -3,8 +3,8 @@
 #
 # This pushes the runner straight to a Pi over passwordless ssh + sudo, which only
 # works when the dev machine can reach the Pi on the LAN/Tailscale. Since the Pi
-# moved off our Wi-Fi, the current path is the manual R2 flow instead:
-#   deploy/upload-bundle.sh   (dev machine: build + upload bundle to Cloudflare R2)
+# moved off our Wi-Fi, the current path is the manual Cloudflare Pages flow instead:
+#   deploy/upload-bundle.sh   (dev machine: build + publish bundle to Cloudflare Pages)
 #   deploy/pull-install.sh    (Pi: download bundle + restart the service)
 #
 # To re-enable this, uncomment the block below.
