@@ -16,7 +16,13 @@ import {
   type DemoEffectId,
 } from './demoEffects';
 import { paintLayers, type Layer } from './layers';
-import { defaultKnobValues, kickCurve, resolveKnobs, type ResolvedKnobs } from './knobs';
+import {
+  defaultKnobValues,
+  kickCurve,
+  resolveKnobs,
+  splitByLayer,
+  type ResolvedKnobs,
+} from './knobs';
 
 export type FrameSink = (universe: number, rgb: Float64Array, brightness: number) => void;
 type Listener = (event: EffectEvent) => void;
@@ -281,7 +287,7 @@ export class EffectSource {
     this.phase += dt * this.speed;
 
     const layers = this.layers;
-    const knobs = this.resolveActiveKnobs(dt);
+    const knobsByLayer = splitByLayer(this.resolveActiveKnobs(dt));
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const buf = this.buffers.get(p.universe)!;
@@ -305,7 +311,7 @@ export class EffectSource {
           bpm: this.bpm,
           twinkleOffset: p.twinkleOffset,
         },
-        knobs,
+        knobsByLayer,
       );
     }
 

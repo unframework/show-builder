@@ -6,12 +6,17 @@ export type Hsla = [number, number, number, number];
 
 export type BlendMode = 'over' | 'add' | 'screen' | 'multiply';
 
-// Authored in HSL (+ coverage), but composited in RGB: hue is the wrong space to
-// mix dissimilar colors, and add/screen/multiply are only meaningful on light.
+// A short name scopes the layer's knobs in the stack, so `paint` reads generic
+// keys. Authored in HSL (+ coverage), but composited in RGB: hue is the wrong
+// space to mix dissimilar colors, and add/screen/multiply only mean anything on
+// light.
 export interface Layer {
+  name: string;
   blend: BlendMode;
   paint: (input: EffectInput, knobs: ResolvedKnobs) => Hsla;
 }
+
+const NO_KNOBS: ResolvedKnobs = {};
 
 // Composite the stack bottom→top into `out` at `ch0`, in linear RGB. The floor is
 // black, so the bottom layer resolves to its own color under any blend mode.
@@ -22,13 +27,13 @@ export function paintLayers(
   ch0: number,
   layers: Layer[],
   input: EffectInput,
-  knobs: ResolvedKnobs,
+  knobsByLayer: Record<string, ResolvedKnobs>,
 ): void {
   let r = 0;
   let g = 0;
   let b = 0;
   for (const layer of layers) {
-    const [h, s, l, a] = layer.paint(input, knobs);
+    const [h, s, l, a] = layer.paint(input, knobsByLayer[layer.name] ?? NO_KNOBS);
     if (a <= 0) continue;
     const [tr, tg, tb] = hslToRgb(h, s, l);
     switch (layer.blend) {

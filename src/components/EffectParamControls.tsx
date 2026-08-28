@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import type { EffectParams } from '../effects/controlMessages';
 import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
-import { kickCurve, type Range } from '../effects/knobs';
+import { KNOB_NS, kickCurve, type KnobDef, type Range } from '../effects/knobs';
 
 // Pixels of travel before the drag axis locks; the lock point (not the initial
 // press) is the reference the value scrubs from.
@@ -276,39 +276,58 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
   if (!schema) return null;
   const values = params[effect] ?? {};
 
+  const groups = new Map<string, [string, KnobDef][]>();
+  for (const entry of Object.entries(schema)) {
+    const i = entry[0].indexOf(KNOB_NS);
+    const layer = i < 0 ? '' : entry[0].slice(0, i);
+    const list = groups.get(layer);
+    if (list) list.push(entry);
+    else groups.set(layer, [entry]);
+  }
+  const showLayers = groups.size > 1;
+
   return (
     <>
-      {Object.entries(schema).map(([key, def]) => {
-        const v = values[key] ?? def.default;
-        return (
-          <div key={key} className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
-              {def.label}
-              {def.type === 'rate' && (
-                <span className="ml-1" title="clock rate">
-                  🕐
-                </span>
-              )}
+      {[...groups].map(([layer, entries]) => (
+        <Fragment key={layer}>
+          {showLayers && (
+            <span className="col-span-full mt-2 border-t border-current/10 pt-2 text-[10px] font-bold uppercase tracking-wider opacity-40">
+              {layer}
             </span>
-            <div className="flex items-center gap-1">
-              <ScrubValue
-                range={def.base}
-                value={v.base}
-                onChange={(x) => void source.setParam(effect, key, 'base', x)}
-                clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
-                size="sm"
-              />
-              <ScrubValue
-                range={def.kick}
-                value={v.kick}
-                onChange={(x) => void source.setParam(effect, key, 'kick', x)}
-                size="sm"
-                tag="k"
-              />
-            </div>
-          </div>
-        );
-      })}
+          )}
+          {entries.map(([key, def]) => {
+            const v = values[key] ?? def.default;
+            return (
+              <div key={key} className="flex flex-col gap-1">
+                <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
+                  {def.label}
+                  {def.type === 'rate' && (
+                    <span className="ml-1" title="clock rate">
+                      🕐
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-1">
+                  <ScrubValue
+                    range={def.base}
+                    value={v.base}
+                    onChange={(x) => void source.setParam(effect, key, 'base', x)}
+                    clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
+                    size="sm"
+                  />
+                  <ScrubValue
+                    range={def.kick}
+                    value={v.kick}
+                    onChange={(x) => void source.setParam(effect, key, 'kick', x)}
+                    size="sm"
+                    tag="k"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </Fragment>
+      ))}
     </>
   );
 }

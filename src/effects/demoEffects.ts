@@ -1,7 +1,7 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
 import type { Layer } from './layers';
 import { beatSpike, ramp2, smoothstep, threshold, verticalFade, type RampPoint } from './stages';
-import { type KnobSchema, type ResolvedKnobs } from './knobs';
+import { prefixKeys, type KnobSchema, type ResolvedKnobs } from './knobs';
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import type { ZoneId } from '../scene/zones';
@@ -22,7 +22,8 @@ type Paint = (input: EffectInput, knobs: ResolvedKnobs) => [number, number, numb
 
 // The common case: one fully opaque layer that owns the whole pixel. An effect
 // with no layers ("zone") paints each pixel its fixed zone color instead.
-const solid = (paint: Paint): Layer => ({
+const solid = (name: string, paint: Paint): Layer => ({
+  name,
   blend: 'over',
   paint: (input, knobs) => {
     const [h, s, l] = paint(input, knobs);
@@ -491,12 +492,18 @@ const BUBBLE_KNOBS: KnobSchema = {
   },
 };
 
+// Rising-bubbles is a stack, so its knobs split by layer: the breathe controls
+// belong to the wash, the blob shaping to the strand layer.
+const { breathe, breatheDepth, ...BLOB_KNOBS } = BUBBLE_KNOBS;
+const WASH_KNOBS: KnobSchema = { breathe, breatheDepth };
+
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
-// persisted per effect. Effects absent here have no knobs.
+// persisted per effect. Keys are scoped by layer name; effects absent here have no
+// knobs.
 export const EFFECT_KNOBS: Partial<Record<DemoEffectId, KnobSchema>> = {
-  noise: NOISE_KNOBS,
-  'noise-rays': RAY_KNOBS,
-  'rising-bubbles': BUBBLE_KNOBS,
+  noise: prefixKeys('blobs', NOISE_KNOBS),
+  'noise-rays': prefixKeys('rays', RAY_KNOBS),
+  'rising-bubbles': { ...prefixKeys('wash', WASH_KNOBS), ...prefixKeys('blobs', BLOB_KNOBS) },
 };
 
 export function createDemoEffects(
@@ -509,17 +516,17 @@ export function createDemoEffects(
   const strands = strandField(pixels);
   return {
     zone: undefined,
-    'lr-sweep': [solid(({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))])],
-    rise: [solid(({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))])],
-    'fb-sweep': [solid(({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))])],
+    'lr-sweep': [solid('sweep', ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))])],
+    rise: [solid('rise', ({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))])],
+    'fb-sweep': [solid('sweep', ({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))])],
     radial: [
-      solid(({ xn, zn, phase }) => {
+      solid('pulse', ({ xn, zn, phase }) => {
         const d = Math.hypot(xn - 0.5, zn - 0.5) * Math.SQRT2;
         return [0.87, 0.9, band(wrap(d - phase * 0.25))];
       }),
     ],
     twinkle: [
-      solid(({ phase, twinkleOffset }) => {
+      solid('twinkle', ({ phase, twinkleOffset }) => {
         const b = Math.pow(0.5 + 0.5 * Math.sin(phase * 2.5 + twinkleOffset), 3);
         return [
           0.06 + 0.06 * Math.sin(twinkleOffset * 5),
@@ -529,7 +536,7 @@ export function createDemoEffects(
       }),
     ],
     noise: [
-      solid(({ xn, yn, zn }, k) => {
+      solid('blobs', ({ xn, yn, zn }, k) => {
         const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
         const v = noise4D(sx, sy, sz, k.time);
         const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
@@ -538,7 +545,7 @@ export function createDemoEffects(
       }),
     ],
     'noise-rays': [
-      solid(({ xn, yn, zn, phase }, k) => {
+      solid('rays', ({ xn, yn, zn, phase }, k) => {
         const dx = Math.abs(xn - fx);
         const dy = yn - fy;
         const dz = (zn - fz) * k.depth;
@@ -560,7 +567,7 @@ export function createDemoEffects(
       }),
     ],
     rings: [
-      solid(({ index, phase, beat, bpm }) => {
+      solid('rings', ({ index, phase, beat, bpm }) => {
         const { r, fade, angle } = rings[index];
         const kick = beatSpike(beat, bpm, PULSE_DECAY);
         const crest = bell(wrap(r * RING_FREQ - phase * RING_SPEED - kick * RING_EXPAND));
@@ -578,6 +585,7 @@ export function createDemoEffects(
     // composited over it — the blobs displace the wash where they cover (amt).
     'rising-bubbles': [
       {
+        name: 'wash',
         blend: 'over',
         paint: ({ xn, yn, zn, phase }, k) => {
           const breathePhase = wrap(
@@ -594,6 +602,7 @@ export function createDemoEffects(
         },
       },
       {
+        name: 'blobs',
         blend: 'over',
         paint: ({ index }, k) => {
           const sid = strands.id[index];
