@@ -1,6 +1,7 @@
 import { hslToRgb } from './color';
 import type { EffectInput } from './demoEffects';
 import type { ResolvedKnobs } from './knobs';
+import type { Ramp } from './stages';
 
 export type Hsla = [number, number, number, number];
 
@@ -9,10 +10,12 @@ export type BlendMode = 'over' | 'add' | 'screen' | 'multiply';
 // A short name scopes the layer's knobs in the stack, so `paint` reads generic
 // keys. Authored in HSL (+ coverage), but composited in RGB: hue is the wrong
 // space to mix dissimilar colors, and add/screen/multiply only mean anything on
-// light.
+// light. `ramp` is the palette the layer colours through, surfaced for the UI (a
+// layer whose colour isn't ramp-driven leaves it undefined).
 export interface Layer {
   name: string;
   blend: BlendMode;
+  ramp?: Ramp;
   paint: (input: EffectInput, knobs: ResolvedKnobs) => Hsla;
 }
 

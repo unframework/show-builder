@@ -1,6 +1,14 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
 import type { Layer } from './layers';
-import { beatSpike, ramp2, smoothstep, threshold, verticalFade, type RampPoint } from './stages';
+import {
+  beatSpike,
+  ramp2,
+  smoothstep,
+  threshold,
+  verticalFade,
+  type Ramp,
+  type RampPoint,
+} from './stages';
 import { prefixKeys, type KnobSchema, type ResolvedKnobs } from './knobs';
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
@@ -22,9 +30,10 @@ type Paint = (input: EffectInput, knobs: ResolvedKnobs) => [number, number, numb
 
 // The common case: one fully opaque layer that owns the whole pixel. An effect
 // with no layers ("zone") paints each pixel its fixed zone color instead.
-const solid = (name: string, paint: Paint): Layer => ({
+const solid = (name: string, paint: Paint, ramp?: Ramp): Layer => ({
   name,
   blend: 'over',
+  ramp,
   paint: (input, knobs) => {
     const [h, s, l] = paint(input, knobs);
     return [h, s, l, 1];
@@ -149,12 +158,14 @@ const BREATHE_ATTACK = 0.1;
 const BREATHE_WOBBLE = 0.15;
 const BREATHE_WOBBLE_RATE = 0.03;
 const BREATHE_SEED = 41;
-const BG_SAT = 0.7;
-const BG_MAX = 0.15; // peak faint-blue lightness at the crown
 const BUBBLE_L = 0.95;
-// The bubble layer's own near-white core; a faint per-strand tint rides the hue.
-const BUBBLE_HUE = 0.68;
-const BUBBLE_SAT = 0.12;
+// The two-point HSL ramps each bubble layer colours through — the swappable
+// "palette" unit. The wash runs dim→brighter blue over its noise coverage; the
+// blobs run a blue edge→near-white core over their coverage.
+const WASH_RAMP_START: RampPoint = { h: 0.8, s: 0.7, l: 0.14 };
+const WASH_RAMP_END: RampPoint = { h: 0.9, s: 0.55, l: 0.26 };
+const BLOB_RAMP_START: RampPoint = { h: 0.66, s: 0.5, l: 0.5 };
+const BLOB_RAMP_END: RampPoint = { h: 0.62, s: 0.1, l: 1 };
 
 // Stateless integer hash → [0,1), decorrelated between neighboring inputs.
 const hashU = (a: number, b: number, c: number) => {
@@ -536,35 +547,43 @@ export function createDemoEffects(
       }),
     ],
     noise: [
-      solid('blobs', ({ xn, yn, zn }, k) => {
-        const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
-        const v = noise4D(sx, sy, sz, k.time);
-        const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-        const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
-        return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
-      }),
+      solid(
+        'blobs',
+        ({ xn, yn, zn }, k) => {
+          const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
+          const v = noise4D(sx, sy, sz, k.time);
+          const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+          const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
+          return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
+        },
+        [NOISE_RAMP_START, NOISE_RAMP_END],
+      ),
     ],
     'noise-rays': [
-      solid('rays', ({ xn, yn, zn, phase }, k) => {
-        const dx = Math.abs(xn - fx);
-        const dy = yn - fy;
-        const dz = (zn - fz) * k.depth;
-        const r = Math.hypot(dx, dy, dz) || 1;
-        const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
-        const v = noise4D(
-          (dx / r) * k.zoom * detail,
-          (dy / r) * k.zoom - k.rise,
-          (dz / r) * k.zoom,
-          k.time,
-        );
-        const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-        const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);
-        return [
-          h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
-          s,
-          l * k.lightGain,
-        ];
-      }),
+      solid(
+        'rays',
+        ({ xn, yn, zn, phase }, k) => {
+          const dx = Math.abs(xn - fx);
+          const dy = yn - fy;
+          const dz = (zn - fz) * k.depth;
+          const r = Math.hypot(dx, dy, dz) || 1;
+          const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
+          const v = noise4D(
+            (dx / r) * k.zoom * detail,
+            (dy / r) * k.zoom - k.rise,
+            (dz / r) * k.zoom,
+            k.time,
+          );
+          const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+          const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);
+          return [
+            h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
+            s,
+            l * k.lightGain,
+          ];
+        },
+        [RAY_RAMP_START, RAY_RAMP_END],
+      ),
     ],
     rings: [
       solid('rings', ({ index, phase, beat, bpm }) => {
@@ -587,6 +606,7 @@ export function createDemoEffects(
       {
         name: 'wash',
         blend: 'over',
+        ramp: [WASH_RAMP_START, WASH_RAMP_END],
         paint: ({ xn, yn, zn, phase }, k) => {
           const breathePhase = wrap(
             k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
@@ -595,15 +615,14 @@ export function createDemoEffects(
           const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1);
           const bgV = noise4D(sx, sy, sz, phase * 0.1);
           const bgAmt = smoothstep(0.1 - 0.15, 0.1 + 0.15, bgV - breatheAdd * 0.2);
-          const yoff = (1 - yn) * (1 - yn);
-          const bgHue = 0.65 + 0.08 * bgAmt + 0.1 * yoff;
-          const bgL = BG_MAX * 0.5 + 0.5 * BG_MAX * bgAmt;
-          return [bgHue + 0.15, BG_SAT, 0.2 + bgL * (1 + breatheAdd * 3), 1];
+          const [h, s, l] = ramp2(bgAmt, WASH_RAMP_START, WASH_RAMP_END);
+          return [h + 0.1 * verticalFade(yn), s, l * (1 + breatheAdd * 2.5), 1];
         },
       },
       {
         name: 'blobs',
         blend: 'over',
+        ramp: [BLOB_RAMP_START, BLOB_RAMP_END],
         paint: ({ index }, k) => {
           const sid = strands.id[index];
           if (sid < 0) return [0, 0, 0, 0];
@@ -614,7 +633,8 @@ export function createDemoEffects(
           const tipFade = 1 - k.tipFade * smoothstep(STRAND_TIP_START, 1, t);
           const amt = smoothstep(k.threshold - k.edge, k.threshold + k.edge, v) * tipFade;
           const tint = (hashU(sid, 0, 1) - 0.5) * k.tint;
-          return [BUBBLE_HUE + tint, BUBBLE_SAT, k.brightness, amt];
+          const [rh, rs, rl] = ramp2(amt, BLOB_RAMP_START, BLOB_RAMP_END);
+          return [rh + tint, rs, rl * k.brightness, amt];
         },
       },
     ],

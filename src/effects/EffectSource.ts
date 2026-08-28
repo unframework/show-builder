@@ -128,6 +128,7 @@ export class EffectSource {
       brightness: this.brightness,
       bpm: this.bpm,
       params: cloneParams(this.params),
+      layers: (this.layers ?? []).map((l) => ({ name: l.name, blend: l.blend, ramp: l.ramp })),
     };
   }
 

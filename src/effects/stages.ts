@@ -32,6 +32,8 @@ export interface RampPoint {
   s: number;
   l: number;
 }
+// An ordered set of HSL stops — a layer's palette. `ramp2` walks two of them.
+export type Ramp = RampPoint[];
 // Two-point HSL ramp: map t∈[0,1] from `start` to `end`.
 export const ramp2 = (t: number, start: RampPoint, end: RampPoint): [number, number, number] => {
   const u = t < 0 ? 0 : t > 1 ? 1 : t;

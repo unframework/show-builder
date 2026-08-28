@@ -29,6 +29,17 @@ export const controlCommand = z.discriminatedUnion('type', [
 ]);
 export type ControlCommand = z.infer<typeof controlCommand>;
 
+// The active effect's layer stack, for display: names, blend modes, and each
+// layer's palette. Static per effect today, but rides the state stream so it's
+// ready to become editable.
+export const rampPoint = z.object({ h: z.number(), s: z.number(), l: z.number() });
+export const layerMeta = z.object({
+  name: z.string(),
+  blend: z.enum(['over', 'add', 'screen', 'multiply']),
+  ramp: z.array(rampPoint).optional(),
+});
+export type LayerMeta = z.infer<typeof layerMeta>;
+
 // Current knob state, snapshotted on connect and re-emitted after every change so
 // multiple controllers stay in sync.
 export const controlState = z.object({
@@ -39,10 +50,11 @@ export const controlState = z.object({
   brightness: z.number(),
   bpm: z.number(),
   params: effectParams.optional(),
+  layers: z.array(layerMeta).optional(),
 });
 export type ControlState = z.infer<typeof controlState>;
 
-export const effectSettings = controlState.omit({ type: true }).partial();
+export const effectSettings = controlState.omit({ type: true, layers: true }).partial();
 export type EffectSettings = z.infer<typeof effectSettings>;
 
 export const controlBeat = z.object({ type: z.literal('beat'), beat: z.number() });

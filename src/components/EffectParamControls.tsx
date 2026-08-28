@@ -1,9 +1,19 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent } from 'react';
 import clsx from 'clsx';
-import type { EffectParams } from '../effects/controlMessages';
+import type { EffectParams, LayerMeta } from '../effects/controlMessages';
 import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
 import { KNOB_NS, kickCurve, type KnobDef, type Range } from '../effects/knobs';
+
+// A layer's palette as a CSS gradient for the read-only swatch. HSL stops map
+// straight to CSS hsl() (0-1 → deg/%), an approximation of the sim's colour.
+const rampCss = (ramp: NonNullable<LayerMeta['ramp']>) => {
+  const stops = ramp.map((p, i) => {
+    const pos = ramp.length === 1 ? 0 : (i / (ramp.length - 1)) * 100;
+    return `hsl(${p.h * 360} ${p.s * 100}% ${p.l * 100}%) ${pos}%`;
+  });
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+};
 
 // Pixels of travel before the drag axis locks; the lock point (not the initial
 // press) is the reference the value scrubs from.
@@ -259,6 +269,7 @@ function ScrubOverlay({ drag, fmt }: { drag: DragState; fmt: (v: number) => stri
 export function EffectParamControls({ source }: { source: EffectControl }) {
   const [effect, setEffect] = useState<DemoEffectId>('zone');
   const [params, setParams] = useState<EffectParams>({});
+  const [layers, setLayers] = useState<LayerMeta[]>([]);
   const [bpm, setBpm] = useState(120);
 
   useEffect(
@@ -267,6 +278,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
         if (event.type !== 'state') return;
         setEffect(event.effect);
         setParams(event.params ?? {});
+        setLayers(event.layers ?? []);
         setBpm(event.bpm);
       }),
     [source],
@@ -288,46 +300,60 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
 
   return (
     <>
-      {[...groups].map(([layer, entries]) => (
-        <Fragment key={layer}>
-          {showLayers && (
-            <span className="col-span-full mt-2 border-t border-current/10 pt-2 text-[10px] font-bold uppercase tracking-wider opacity-40">
-              {layer}
-            </span>
-          )}
-          {entries.map(([key, def]) => {
-            const v = values[key] ?? def.default;
-            return (
-              <div key={key} className="flex flex-col gap-1">
-                <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
-                  {def.label}
-                  {def.type === 'rate' && (
-                    <span className="ml-1" title="clock rate">
-                      🕐
-                    </span>
-                  )}
-                </span>
-                <div className="flex items-center gap-1">
-                  <ScrubValue
-                    range={def.base}
-                    value={v.base}
-                    onChange={(x) => void source.setParam(effect, key, 'base', x)}
-                    clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
-                    size="sm"
+      {[...groups].map(([layer, entries]) => {
+        const ramp = layers.find((l) => l.name === layer)?.ramp;
+        return (
+          <Fragment key={layer}>
+            {(showLayers || ramp) && (
+              <div className="col-span-full mt-2 flex items-center gap-2 border-t border-current/10 pt-2">
+                {showLayers && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-40">
+                    {layer}
+                  </span>
+                )}
+                {ramp && ramp.length > 0 && (
+                  <span
+                    className="h-2 w-16 rounded-sm"
+                    style={{ background: rampCss(ramp) }}
+                    title="palette (read-only)"
                   />
-                  <ScrubValue
-                    range={def.kick}
-                    value={v.kick}
-                    onChange={(x) => void source.setParam(effect, key, 'kick', x)}
-                    size="sm"
-                    tag="k"
-                  />
-                </div>
+                )}
               </div>
-            );
-          })}
-        </Fragment>
-      ))}
+            )}
+            {entries.map(([key, def]) => {
+              const v = values[key] ?? def.default;
+              return (
+                <div key={key} className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
+                    {def.label}
+                    {def.type === 'rate' && (
+                      <span className="ml-1" title="clock rate">
+                        🕐
+                      </span>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <ScrubValue
+                      range={def.base}
+                      value={v.base}
+                      onChange={(x) => void source.setParam(effect, key, 'base', x)}
+                      clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
+                      size="sm"
+                    />
+                    <ScrubValue
+                      range={def.kick}
+                      value={v.kick}
+                      onChange={(x) => void source.setParam(effect, key, 'kick', x)}
+                      size="sm"
+                      tag="k"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </Fragment>
+        );
+      })}
     </>
   );
 }
