@@ -40,6 +40,20 @@ const solid = (name: string, paint: Paint, ramp?: Ramp): Layer => ({
   },
 });
 
+// Colours the layers below by height: samples the ramp on a squared vertical
+// curve (start at the floor, end at the crown) and multiplies it in, so a white
+// start preserves their colour and a tinted end shades toward it. `strength`
+// (0..1) fades the whole tint.
+const heightRamp = (name: string, ramp: [RampPoint, RampPoint]): Layer => ({
+  name,
+  blend: 'multiply',
+  ramp,
+  paint: ({ yn }, k) => {
+    const [h, s, l] = ramp2(1 - verticalFade(yn), ramp[0], ramp[1]);
+    return [h, s, l, k.strength ?? 1];
+  },
+});
+
 // stable stuff reused across hot-reloads
 export interface DemoEffectContext {
   noise4D: NoiseFunction4D;
@@ -145,8 +159,8 @@ const STRAND_TINT = 0.16;
 // the fade begins (1 = apex). Keeps the very tips from reading as hard dots.
 const STRAND_TIP_FADE = 0.4;
 const STRAND_TIP_START = 0.82;
-// Slow global brightness pulse on the blobs. BREATHE_PERIOD is in phase units
-// (~seconds at speed 1). The period wobbles via noise while staying strictly
+// Slow global brightness pulse screened over the wash. BREATHE_PERIOD is in phase
+// units (~seconds at speed 1). The period wobbles via noise while staying strictly
 // recurring: the wobble's slope stays well under the base rate, so the pulse
 // never reverses — it just breathes a little early/late.
 const BREATHE_PERIOD = 8;
@@ -158,14 +172,20 @@ const BREATHE_ATTACK = 0.1;
 const BREATHE_WOBBLE = 0.15;
 const BREATHE_WOBBLE_RATE = 0.03;
 const BREATHE_SEED = 41;
+// Peak screen coverage of the pulse at full depth.
+const BREATHE_GAIN = 0.6;
 const BUBBLE_L = 0.95;
 // The two-point HSL ramps each bubble layer colours through — the swappable
 // "palette" unit. The wash runs dim→brighter blue over its noise coverage; the
-// blobs run a blue edge→near-white core over their coverage.
+// blobs run a blue edge→near-white core over their coverage; the height ramp
+// multiplies white (floor) → a cool tint (crown) over the wash.
 const WASH_RAMP_START: RampPoint = { h: 0.8, s: 0.7, l: 0.14 };
 const WASH_RAMP_END: RampPoint = { h: 0.9, s: 0.55, l: 0.26 };
 const BLOB_RAMP_START: RampPoint = { h: 0.66, s: 0.5, l: 0.5 };
 const BLOB_RAMP_END: RampPoint = { h: 0.62, s: 0.1, l: 1 };
+const HEIGHT_RAMP_BOTTOM: RampPoint = { h: 0, s: 0, l: 1 };
+const HEIGHT_RAMP_TOP: RampPoint = { h: 0.62, s: 0.5, l: 0.85 };
+const HEIGHT_RAMP_STRENGTH = 1;
 
 // Stateless integer hash → [0,1), decorrelated between neighboring inputs.
 const hashU = (a: number, b: number, c: number) => {
@@ -503,10 +523,47 @@ const BUBBLE_KNOBS: KnobSchema = {
   },
 };
 
-// Rising-bubbles is a stack, so its knobs split by layer: the breathe controls
-// belong to the wash, the blob shaping to the strand layer.
+// Rising-bubbles is a stack, so its knobs split by layer: the pulse controls drive
+// the breathe layer, the strength the height ramp, the rest the strand layer.
 const { breathe, breatheDepth, ...BLOB_KNOBS } = BUBBLE_KNOBS;
-const WASH_KNOBS: KnobSchema = { breathe, breatheDepth };
+const BREATHE_KNOBS: KnobSchema = { breathe, breatheDepth };
+// The wash is the standalone noise field without its hue/brightness knobs, which
+// the height and breathe layers now own.
+const WASH_KNOBS: KnobSchema = {
+  zoom: {
+    label: 'zoom',
+    base: { min: 0.2, max: 3, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: 1, kick: 0 },
+  },
+  time: {
+    label: 'time',
+    type: 'rate',
+    base: { min: 0, max: 2, step: 0.01 },
+    kick: { min: -2, max: 2, step: 0.01 },
+    default: { base: 0.1, kick: 0 },
+  },
+  thresholdAt: {
+    label: 'threshold',
+    base: { min: -1, max: 1, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.005 },
+    default: { base: 0.1, kick: 0 },
+  },
+  thresholdEdge: {
+    label: 'edge',
+    base: { min: 0.001, max: 0.5, step: 0.001 },
+    kick: { min: -0.5, max: 0.5, step: 0.001 },
+    default: { base: 0.15, kick: 0 },
+  },
+};
+const HEIGHT_KNOBS: KnobSchema = {
+  strength: {
+    label: 'height ramp',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: HEIGHT_RAMP_STRENGTH, kick: 0 },
+  },
+};
 
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
 // persisted per effect. Keys are scoped by layer name; effects absent here have no
@@ -514,7 +571,12 @@ const WASH_KNOBS: KnobSchema = { breathe, breatheDepth };
 export const EFFECT_KNOBS: Partial<Record<DemoEffectId, KnobSchema>> = {
   noise: prefixKeys('blobs', NOISE_KNOBS),
   'noise-rays': prefixKeys('rays', RAY_KNOBS),
-  'rising-bubbles': { ...prefixKeys('wash', WASH_KNOBS), ...prefixKeys('blobs', BLOB_KNOBS) },
+  'rising-bubbles': {
+    ...prefixKeys('wash', WASH_KNOBS),
+    ...prefixKeys('breathe', BREATHE_KNOBS),
+    ...prefixKeys('height', HEIGHT_KNOBS),
+    ...prefixKeys('blobs', BLOB_KNOBS),
+  },
 };
 
 export function createDemoEffects(
@@ -600,25 +662,31 @@ export function createDemoEffects(
         ];
       }),
     ],
-    // Two stacked layers: a slow breathing foundation wash, and the rising blobs
-    // composited over it — the blobs displace the wash where they cover (amt).
+    // Breathe and height sit under the blobs, so they colour only the wash while
+    // the rising blobs stay pure on top.
     'rising-bubbles': [
+      solid(
+        'wash',
+        ({ xn, yn, zn }, k) => {
+          const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
+          const v = noise4D(sx, sy, sz, k.time);
+          const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+          return ramp2(amt, WASH_RAMP_START, WASH_RAMP_END);
+        },
+        [WASH_RAMP_START, WASH_RAMP_END],
+      ),
       {
-        name: 'wash',
-        blend: 'over',
-        ramp: [WASH_RAMP_START, WASH_RAMP_END],
-        paint: ({ xn, yn, zn, phase }, k) => {
+        name: 'breathe',
+        blend: 'screen',
+        paint: ({ phase }, k) => {
           const breathePhase = wrap(
             k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
           );
-          const breatheAdd = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK);
-          const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, 1);
-          const bgV = noise4D(sx, sy, sz, phase * 0.1);
-          const bgAmt = smoothstep(0.1 - 0.15, 0.1 + 0.15, bgV - breatheAdd * 0.2);
-          const [h, s, l] = ramp2(bgAmt, WASH_RAMP_START, WASH_RAMP_END);
-          return [h + 0.1 * verticalFade(yn), s, l * (1 + breatheAdd * 2.5), 1];
+          const amt = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK) * BREATHE_GAIN;
+          return [0, 0, 1, amt < 0 ? 0 : amt > 1 ? 1 : amt];
         },
       },
+      heightRamp('height', [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
       {
         name: 'blobs',
         blend: 'over',
