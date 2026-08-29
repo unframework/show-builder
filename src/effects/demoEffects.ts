@@ -163,21 +163,21 @@ const STRAND_TINT = 0.16;
 // the fade begins (1 = apex). Keeps the very tips from reading as hard dots.
 const STRAND_TIP_FADE = 0.4;
 const STRAND_TIP_START = 0.82;
-// Slow global brightness pulse screened over the wash. BREATHE_PERIOD is in phase
-// units (~seconds at speed 1). The period wobbles via noise while staying strictly
-// recurring: the wobble's slope stays well under the base rate, so the pulse
-// never reverses — it just breathes a little early/late.
+// The pulse layer's LFO shaping, shared by the bubbles breathe and any beat flash.
+// `ATTACK` is the fraction of the cycle spent rising; the period wobbles via noise
+// while staying strictly recurring (the wobble's slope stays well under the base
+// rate), so a running breath never reverses — it just breathes a little early/late.
+const PULSE_ATTACK = 0.1;
+const PULSE_WOBBLE = 0.15;
+const PULSE_WOBBLE_RATE = 0.03;
+const PULSE_SEED = 41;
+// A black→white default ramp, so bare coverage screens as plain brightness.
+const PULSE_RAMP_LOW: RampPoint = { h: 0, s: 0, l: 0 };
+const PULSE_RAMP_HIGH: RampPoint = { h: 0, s: 0, l: 1 };
+// The bubbles breathe instance: LFO period (phase units, ~seconds at speed 1) and
+// its swell depth (peak screen coverage).
 const BREATHE_PERIOD = 8;
-// Brightness added.
-const BREATHE_DEPTH = 1;
-// Attack fraction of the cycle: small = snappy rise, long slow release.
-const BREATHE_ATTACK = 0.1;
-// Period wobble: ± cycles of phase jitter, and how fast that jitter itself drifts.
-const BREATHE_WOBBLE = 0.15;
-const BREATHE_WOBBLE_RATE = 0.03;
-const BREATHE_SEED = 41;
-// Peak screen coverage of the pulse at full depth.
-const BREATHE_GAIN = 0.6;
+const BREATHE_SWELL = 0.6;
 const BUBBLE_L = 0.95;
 // The two-point HSL ramps each bubble layer colours through — the swappable
 // "palette" unit. The wash runs dim→brighter blue over its noise coverage; the
@@ -356,14 +356,28 @@ export const DEMO_EFFECTS = [
 
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
 
-// A beat-kicked brightness screened over a layer below. `gain` reads as a
-// lightness multiplier (1 = unchanged); the layer screens white by gain − 1.
-const BRIGHTNESS_KNOBS: KnobSchema = {
-  gain: {
-    label: 'brightness',
-    base: { min: 1, max: 2, step: 0.01 },
+// The pulse layer: an LFO breath (`rate` + `swell`) plus a `flash` coverage whose
+// beat-kick gives a pure downbeat pulse. Each instance uses whichever it needs and
+// leaves the rest at zero.
+const PULSE_KNOBS: KnobSchema = {
+  rate: {
+    label: 'rate',
+    type: 'rate',
+    base: { min: 0, max: 1, step: 0.005 },
+    kick: { min: -1, max: 1, step: 0.005 },
+    default: { base: 0, kick: 0 },
+  },
+  swell: {
+    label: 'swell',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: 0, kick: 0 },
+  },
+  flash: {
+    label: 'flash',
+    base: { min: 0, max: 1, step: 0.01 },
     kick: { min: -1, max: 2, step: 0.01 },
-    default: { base: 1, kick: NOISE_KICK_LIGHT },
+    default: { base: 0, kick: 0 },
   },
 };
 
@@ -432,7 +446,7 @@ const RAY_KNOBS: KnobSchema = {
   },
 };
 
-const BUBBLE_KNOBS: KnobSchema = {
+const BLOB_KNOBS: KnobSchema = {
   freq: {
     label: 'density',
     base: { min: 2, max: 30, step: 0.5 },
@@ -477,19 +491,6 @@ const BUBBLE_KNOBS: KnobSchema = {
     kick: { min: -1, max: 1, step: 0.01 },
     default: { base: STRAND_TIP_FADE, kick: 0 },
   },
-  breathe: {
-    label: 'breathe',
-    type: 'rate',
-    base: { min: 0, max: 1, step: 0.005 },
-    kick: { min: -1, max: 1, step: 0.005 },
-    default: { base: 1 / BREATHE_PERIOD, kick: 0 },
-  },
-  breatheDepth: {
-    label: 'breathe depth',
-    base: { min: 0, max: 2, step: 0.01 },
-    kick: { min: -2, max: 2, step: 0.01 },
-    default: { base: BREATHE_DEPTH, kick: 0 },
-  },
   brightness: {
     label: 'brightness',
     base: { min: 0, max: 1, step: 0.01 },
@@ -498,10 +499,6 @@ const BUBBLE_KNOBS: KnobSchema = {
   },
 };
 
-// Rising-bubbles is a stack, so its knobs split by layer: the pulse controls drive
-// the breathe layer, the strength the height ramp, the rest the strand layer.
-const { breathe, breatheDepth, ...BLOB_KNOBS } = BUBBLE_KNOBS;
-const BREATHE_KNOBS: KnobSchema = { breathe, breatheDepth };
 // The focus-warped noise field shared by the bubbles wash and the standalone noise
 // effect; height and brightness live in sibling layers. Defaults here are the
 // wash's; the noise effect retunes them per instance in its stack.
@@ -559,29 +556,25 @@ const noiseFieldKind = defineKind<EffectRuntime>({
     },
 });
 
-// A beat-kicked brightness: screens white over the layers below by `gain` − 1, so
-// gain 1 is a no-op and the kick lifts the whole field on the downbeat.
-const brightnessKind = defineKind<EffectRuntime>({
-  schema: BRIGHTNESS_KNOBS,
-  makePaint: () => (_input, k) => {
-    const a = k.gain - 1;
-    return [0, 0, 1, a < 0 ? 0 : a > 1 ? 1 : a];
-  },
-});
-
-// A slow global brightness pulse, screened over the wash. Period wobbles via noise
-// while staying strictly recurring, so the pulse never reverses — just breathes
-// a little early/late.
-const breatheKind = defineKind<EffectRuntime>({
-  schema: BREATHE_KNOBS,
+// A pulse screened through a ramp, driven by an LFO and/or a beat flash: `rate`
+// clocks the LFO (0 = frozen), `swell` is its depth, and `flash` adds coverage
+// directly — so `swell`+`rate` breathe, while `flash`'s own beat-kick alone gives
+// a pure downbeat pulse with no LFO. The period wobbles via noise but never
+// reverses, so a running breath stays strictly recurring. Coverage rides the ramp
+// (a black→white default screens plain brightness; any palette tints the pulse).
+const pulseKind = defineKind<EffectRuntime>({
+  schema: PULSE_KNOBS,
   makePaint:
     ({ noise4D }) =>
-    ({ phase }, k) => {
-      const breathePhase = wrap(
-        k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
+    ({ phase }, k, ramp) => {
+      const lfoPhase = wrap(
+        k.rate + PULSE_WOBBLE * noise4D(PULSE_SEED, phase * PULSE_WOBBLE_RATE, 0, 0),
       );
-      const amt = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK) * BREATHE_GAIN;
-      return [0, 0, 1, amt < 0 ? 0 : amt > 1 ? 1 : amt];
+      const raw = k.swell * asymPulse(lfoPhase, PULSE_ATTACK) + k.flash;
+      const amt = raw < 0 ? 0 : raw > 1 ? 1 : raw;
+      const [start, end] = ramp ?? [PULSE_RAMP_LOW, PULSE_RAMP_HIGH];
+      const [h, s, l] = ramp2(amt, start, end);
+      return [h, s, l, 1];
     },
 });
 
@@ -625,7 +618,10 @@ const strandBlobsKind = defineKind<EffectRuntime>({
 // rising blobs stay pure on top.
 const RISING_BUBBLES: LayerSlot<EffectRuntime>[] = [
   slot('wash', 'over', noiseFieldKind, [WASH_RAMP_START, WASH_RAMP_END]),
-  slot('breathe', 'screen', breatheKind),
+  slot('breathe', 'screen', pulseKind, [PULSE_RAMP_LOW, PULSE_RAMP_HIGH], {
+    rate: { base: 1 / BREATHE_PERIOD },
+    swell: { base: BREATHE_SWELL },
+  }),
   slot('height', 'multiply', heightRampKind, [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
   slot('blobs', 'over', strandBlobsKind, [BLOB_RAMP_START, BLOB_RAMP_END]),
 ];
@@ -641,7 +637,9 @@ const NOISE_BLOBS: LayerSlot<EffectRuntime>[] = [
     thresholdEdge: { base: NOISE_EDGE },
   }),
   slot('height', 'multiply', heightRampKind, [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
-  slot('bright', 'screen', brightnessKind),
+  slot('bright', 'screen', pulseKind, [PULSE_RAMP_LOW, PULSE_RAMP_HIGH], {
+    flash: { kick: NOISE_KICK_LIGHT },
+  }),
 ];
 
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
