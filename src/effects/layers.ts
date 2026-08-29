@@ -1,6 +1,6 @@
 import { hslToRgb } from './color';
 import type { EffectInput } from './demoEffects';
-import type { KnobSchema, KnobValues, ResolvedKnobs } from './knobs';
+import type { KnobSchema, KnobValue, KnobValues, ResolvedKnobs } from './knobs';
 import type { Ramp } from './stages';
 
 export type Hsla = [number, number, number, number];
@@ -31,13 +31,18 @@ export interface LayerKind<Ctx> {
   makePaint: (ctx: Ctx) => Paint;
 }
 
-// One named instance of a kind in an effect's static stack: its blend, plus a
-// default ramp seeding the instance's runtime state.
+// Per-knob starting-value overrides for a kind reused across instances: each
+// instance can retune the shared schema's base/kick without its own kind.
+export type KnobDefaults = Record<string, Partial<KnobValue>>;
+
+// One named instance of a kind in an effect's static stack: its blend, a default
+// ramp seeding runtime state, and any per-instance knob-default overrides.
 export interface LayerSlot<Ctx> {
   name: string;
   blend: BlendMode;
   kind: LayerKind<Ctx>;
   ramp?: Ramp;
+  defaults?: KnobDefaults;
 }
 
 // Per-instance runtime state: knob values and the current ramp.
@@ -59,14 +64,28 @@ export const slot = <Ctx>(
   blend: BlendMode,
   kind: LayerKind<Ctx>,
   ramp?: Ramp,
-): LayerSlot<Ctx> => ({ name, blend, kind, ramp });
+  defaults?: KnobDefaults,
+): LayerSlot<Ctx> => ({ name, blend, kind, ramp, defaults });
+
+// Overlay per-instance starting values onto a shared schema.
+function withDefaults(schema: KnobSchema, defaults?: KnobDefaults): KnobSchema {
+  if (!defaults) return schema;
+  const out: KnobSchema = {};
+  for (const key in schema) {
+    const override = defaults[key];
+    out[key] = override
+      ? { ...schema[key], default: { ...schema[key].default, ...override } }
+      : schema[key];
+  }
+  return out;
+}
 
 // The effect's namespaced knob schema, keyed by instance name; knob-less kinds
 // drop out so a knob-free effect yields an empty map.
 export function topologySchemas<Ctx>(slots: LayerSlot<Ctx>[]): Record<string, KnobSchema> {
   const out: Record<string, KnobSchema> = {};
-  for (const { name, kind } of slots) {
-    if (Object.keys(kind.schema).length) out[name] = kind.schema;
+  for (const { name, kind, defaults } of slots) {
+    if (Object.keys(kind.schema).length) out[name] = withDefaults(kind.schema, defaults);
   }
   return out;
 }

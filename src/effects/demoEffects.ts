@@ -93,7 +93,10 @@ const PULSE_EXPAND = 0.1;
 // height-driven hue tint layered on top.
 const NOISE_RAMP_START: RampPoint = { h: -0.2, s: 1, l: 0 };
 const NOISE_RAMP_END: RampPoint = { h: 0.05, s: 1, l: 0.5 };
-const NOISE_HEIGHT_HUE = -0.2;
+// A cool tint multiplied over the field near the floor, fading to white (no tint)
+// at the crown — the height colouring the standalone noise effect layers on top.
+const NOISE_HEIGHT_RAMP_FLOOR: RampPoint = { h: 0.9, s: 0.5, l: 0.85 };
+const NOISE_HEIGHT_RAMP_CROWN: RampPoint = { h: 0, s: 0, l: 1 };
 const NOISE_KICK_LIGHT = 0.2;
 // Feature count across the unit sphere the rays pierce. Smaller = fewer, broader shafts.
 const RAY_NOISE_SCALE = 3;
@@ -353,43 +356,14 @@ export const DEMO_EFFECTS = [
 
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
 
-const NOISE_KNOBS: KnobSchema = {
-  time: {
-    label: 'time',
-    type: 'rate',
-    base: { min: 0, max: 2, step: 0.01 },
-    kick: { min: -2, max: 2, step: 0.01 },
-    default: { base: NOISE_TIME, kick: 0 },
-  },
-  thresholdAt: {
-    label: 'threshold',
-    base: { min: -1, max: 1, step: 0.01 },
-    kick: { min: -0.5, max: 0.5, step: 0.005 },
-    default: { base: NOISE_THRESHOLD, kick: PULSE_DEPTH },
-  },
-  thresholdEdge: {
-    label: 'edge',
-    base: { min: 0.001, max: 0.5, step: 0.001 },
-    kick: { min: -0.5, max: 0.5, step: 0.001 },
-    default: { base: NOISE_EDGE, kick: 0 },
-  },
-  zoom: {
-    label: 'zoom',
-    base: { min: 0.2, max: 3, step: 0.01 },
-    kick: { min: -1, max: 1, step: 0.01 },
-    default: { base: 1, kick: -PULSE_EXPAND },
-  },
-  lightGain: {
+// A beat-kicked brightness screened over a layer below. `gain` reads as a
+// lightness multiplier (1 = unchanged); the layer screens white by gain − 1.
+const BRIGHTNESS_KNOBS: KnobSchema = {
+  gain: {
     label: 'brightness',
-    base: { min: 0, max: 2, step: 0.01 },
+    base: { min: 1, max: 2, step: 0.01 },
     kick: { min: -1, max: 2, step: 0.01 },
     default: { base: 1, kick: NOISE_KICK_LIGHT },
-  },
-  heightHue: {
-    label: 'height hue',
-    base: { min: -1, max: 1, step: 0.01 },
-    kick: { min: -1, max: 1, step: 0.01 },
-    default: { base: NOISE_HEIGHT_HUE, kick: 0 },
   },
 };
 
@@ -528,9 +502,10 @@ const BUBBLE_KNOBS: KnobSchema = {
 // the breathe layer, the strength the height ramp, the rest the strand layer.
 const { breathe, breatheDepth, ...BLOB_KNOBS } = BUBBLE_KNOBS;
 const BREATHE_KNOBS: KnobSchema = { breathe, breatheDepth };
-// The wash is the standalone noise field without its hue/brightness knobs, which
-// the height and breathe layers now own.
-const WASH_KNOBS: KnobSchema = {
+// The focus-warped noise field shared by the bubbles wash and the standalone noise
+// effect; height and brightness live in sibling layers. Defaults here are the
+// wash's; the noise effect retunes them per instance in its stack.
+const FIELD_KNOBS: KnobSchema = {
   zoom: {
     label: 'zoom',
     base: { min: 0.2, max: 3, step: 0.01 },
@@ -566,9 +541,10 @@ const HEIGHT_KNOBS: KnobSchema = {
   },
 };
 
-// The wash is the standalone noise field, coloured through its ramp.
-const noiseWashKind = defineKind<EffectRuntime>({
-  schema: WASH_KNOBS,
+// A focus-warped noise field soft-thresholded into coverage and coloured through
+// its ramp — the opaque base of both the bubbles wash and the noise effect.
+const noiseFieldKind = defineKind<EffectRuntime>({
+  schema: FIELD_KNOBS,
   makePaint:
     ({ noise4D, focus }) =>
     ({ xn, yn, zn }, k, ramp) => {
@@ -581,6 +557,16 @@ const noiseWashKind = defineKind<EffectRuntime>({
       const [h, s, l] = ramp2(amt, start, end);
       return [h, s, l, 1];
     },
+});
+
+// A beat-kicked brightness: screens white over the layers below by `gain` − 1, so
+// gain 1 is a no-op and the kick lifts the whole field on the downbeat.
+const brightnessKind = defineKind<EffectRuntime>({
+  schema: BRIGHTNESS_KNOBS,
+  makePaint: () => (_input, k) => {
+    const a = k.gain - 1;
+    return [0, 0, 1, a < 0 ? 0 : a > 1 ? 1 : a];
+  },
 });
 
 // A slow global brightness pulse, screened over the wash. Period wobbles via noise
@@ -638,24 +624,39 @@ const strandBlobsKind = defineKind<EffectRuntime>({
 // Breathe and height sit under the blobs, so they colour only the wash while the
 // rising blobs stay pure on top.
 const RISING_BUBBLES: LayerSlot<EffectRuntime>[] = [
-  slot('wash', 'over', noiseWashKind, [WASH_RAMP_START, WASH_RAMP_END]),
+  slot('wash', 'over', noiseFieldKind, [WASH_RAMP_START, WASH_RAMP_END]),
   slot('breathe', 'screen', breatheKind),
   slot('height', 'multiply', heightRampKind, [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
   slot('blobs', 'over', strandBlobsKind, [BLOB_RAMP_START, BLOB_RAMP_END]),
 ];
 
+// The standalone noise effect, decomposed like the bubbles: the shared field base
+// retuned to its own defaults, a height tint multiplied over it, and a beat
+// brightness screened on top.
+const NOISE_BLOBS: LayerSlot<EffectRuntime>[] = [
+  slot('field', 'over', noiseFieldKind, [NOISE_RAMP_START, NOISE_RAMP_END], {
+    zoom: { kick: -PULSE_EXPAND },
+    time: { base: NOISE_TIME },
+    thresholdAt: { base: NOISE_THRESHOLD, kick: PULSE_DEPTH },
+    thresholdEdge: { base: NOISE_EDGE },
+  }),
+  slot('height', 'multiply', heightRampKind, [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
+  slot('bright', 'screen', brightnessKind),
+];
+
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
 // persisted per effect, keyed effect → layer → knob. Effects absent here have no
-// knobs. Non-bubbles effects are single-layer, named to match their built layer.
+// knobs. noise-rays is still single-layer, named to match its built layer.
 export const EFFECT_KNOBS: Partial<Record<DemoEffectId, Record<string, KnobSchema>>> = {
-  noise: { blobs: NOISE_KNOBS },
+  noise: topologySchemas(NOISE_BLOBS),
   'noise-rays': { rays: RAY_KNOBS },
   'rising-bubbles': topologySchemas(RISING_BUBBLES),
 };
 
-// Seed ramps for layers that own their ramp as runtime state (bubbles today);
-// other effects keep their ramp baked into paint and expose it only for display.
+// Seed ramps for layers that own their ramp as runtime state; other effects keep
+// their ramp baked into paint and expose it only for display.
 export const EFFECT_RAMPS: Partial<Record<DemoEffectId, Record<string, Ramp>>> = {
+  noise: topologyRamps(NOISE_BLOBS),
   'rising-bubbles': topologyRamps(RISING_BUBBLES),
 };
 
@@ -688,19 +689,7 @@ export function createDemoEffects(
         ];
       }),
     ],
-    noise: [
-      solid(
-        'blobs',
-        ({ xn, yn, zn }, k) => {
-          const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
-          const v = noise4D(sx, sy, sz, k.time);
-          const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-          const [h, s, l] = ramp2(amt, NOISE_RAMP_START, NOISE_RAMP_END);
-          return [h + k.heightHue * verticalFade(yn), s, l * k.lightGain];
-        },
-        [NOISE_RAMP_START, NOISE_RAMP_END],
-      ),
-    ],
+    noise: buildLayers(NOISE_BLOBS, { noise4D, focus, strands }),
     'noise-rays': [
       solid(
         'rays',
