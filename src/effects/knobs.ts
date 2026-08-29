@@ -49,27 +49,3 @@ export function resolveKnobs(schema: KnobSchema, values: KnobValues, kick: numbe
   }
   return resolved;
 }
-
-// A layer scopes its knobs under a short name: generic keys ("hue", "rise") stay
-// meaningful because the layer names them in the stack. Keys are the composite
-// `layer${NS}knob`; params, persistence, and the wire protocol stay flat.
-export const KNOB_NS = '.';
-
-export function prefixKeys(prefix: string, schema: KnobSchema): KnobSchema {
-  const out: KnobSchema = {};
-  for (const key in schema) out[`${prefix}${KNOB_NS}${key}`] = schema[key];
-  return out;
-}
-
-// Regroup resolved knobs back into per-layer scalars, stripping the prefix so each
-// layer reads generic names.
-export function splitByLayer(resolved: ResolvedKnobs): Record<string, ResolvedKnobs> {
-  const out: Record<string, ResolvedKnobs> = {};
-  for (const key in resolved) {
-    const i = key.indexOf(KNOB_NS);
-    const layer = i < 0 ? '' : key.slice(0, i);
-    const knob = i < 0 ? key : key.slice(i + 1);
-    (out[layer] ??= {})[knob] = resolved[key];
-  }
-  return out;
-}

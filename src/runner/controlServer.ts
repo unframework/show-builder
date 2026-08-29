@@ -87,7 +87,10 @@ export function startControlServer({
           source.setRunning(cmd.running);
           break;
         case 'set-param':
-          source.setParam(cmd.effect, cmd.key, cmd.field, cmd.value);
+          source.setParam(cmd.effect, cmd.layer, cmd.key, cmd.field, cmd.value);
+          break;
+        case 'set-ramp':
+          source.setRamp(cmd.effect, cmd.layer, cmd.ramp);
           break;
         case 'set-output':
           output.setDestination(cmd.host, cmd.port);

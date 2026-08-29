@@ -23,12 +23,21 @@ export function snapshotSignature(s: ControlSnapshot): string {
   const params = Object.keys(s.params)
     .sort()
     .map((effect) => {
-      const knobs = s.params[effect];
+      const layers = s.params[effect];
       return [
         effect,
-        Object.keys(knobs)
+        Object.keys(layers)
           .sort()
-          .map((k) => [k, knobs[k].base, knobs[k].kick]),
+          .map((layer) => {
+            const st = layers[layer];
+            return [
+              layer,
+              Object.keys(st.knobs)
+                .sort()
+                .map((k) => [k, st.knobs[k].base, st.knobs[k].kick]),
+              st.ramp ?? null,
+            ];
+          }),
       ];
     });
   const output = s.output ? [s.output.host, s.output.port] : null;
@@ -51,11 +60,20 @@ export function restoreSnapshot(
   for (const effect of Object.keys(to.params) as DemoEffectId[]) {
     const target = to.params[effect];
     const current = from.params[effect] ?? {};
-    for (const key of Object.keys(target)) {
-      const t = target[key];
-      const c = current[key];
-      if (!c || c.base !== t.base) ops.push(control.setParam(effect, key, 'base', t.base));
-      if (!c || c.kick !== t.kick) ops.push(control.setParam(effect, key, 'kick', t.kick));
+    for (const layer of Object.keys(target)) {
+      const t = target[layer];
+      const c = current[layer];
+      for (const key of Object.keys(t.knobs)) {
+        const tv = t.knobs[key];
+        const cv = c?.knobs[key];
+        if (!cv || cv.base !== tv.base)
+          ops.push(control.setParam(effect, layer, key, 'base', tv.base));
+        if (!cv || cv.kick !== tv.kick)
+          ops.push(control.setParam(effect, layer, key, 'kick', tv.kick));
+      }
+      if (t.ramp && JSON.stringify(t.ramp) !== JSON.stringify(c?.ramp)) {
+        ops.push(control.setRamp(effect, layer, t.ramp));
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import type { EffectEvent } from './controlMessages';
 import type { DemoEffectId } from './demoEffects';
+import type { Ramp } from './stages';
 
 // Transport-agnostic control surface for the effect generator. In-tab an adapter
 // satisfies it with direct calls; a WebSocket adapter can satisfy the same
@@ -9,8 +10,16 @@ export interface EffectControl {
   setSpeed(speed: number): Promise<void>;
   setBrightness(brightness: number): Promise<void>;
   setBpm(bpm: number): Promise<void>;
-  // Set a per-effect knob's base value or its beat-kick amount.
-  setParam(effect: DemoEffectId, key: string, field: 'base' | 'kick', value: number): Promise<void>;
+  // Set a layer knob's base value or its beat-kick amount.
+  setParam(
+    effect: DemoEffectId,
+    layer: string,
+    key: string,
+    field: 'base' | 'kick',
+    value: number,
+  ): Promise<void>;
+  // Replace a layer's ramp (runtime state).
+  setRamp(effect: DemoEffectId, layer: string, ramp: Ramp): Promise<void>;
   // Halt phase advance and emission; the beat clock keeps running
   setRunning(running: boolean): Promise<void>;
   // Anchor the beat clock to the downbeat

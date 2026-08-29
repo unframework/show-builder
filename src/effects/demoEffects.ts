@@ -1,5 +1,13 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
-import type { Layer } from './layers';
+import {
+  buildLayers,
+  defineKind,
+  slot,
+  topologyRamps,
+  topologySchemas,
+  type Layer,
+  type LayerSlot,
+} from './layers';
 import {
   beatSpike,
   ramp2,
@@ -9,7 +17,7 @@ import {
   type Ramp,
   type RampPoint,
 } from './stages';
-import { prefixKeys, type KnobSchema, type ResolvedKnobs } from './knobs';
+import type { KnobSchema, ResolvedKnobs } from './knobs';
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import type { ZoneId } from '../scene/zones';
@@ -40,20 +48,6 @@ const solid = (name: string, paint: Paint, ramp?: Ramp): Layer => ({
   },
 });
 
-// Colours the layers below by height: samples the ramp on a squared vertical
-// curve (start at the floor, end at the crown) and multiplies it in, so a white
-// start preserves their colour and a tinted end shades toward it. `strength`
-// (0..1) fades the whole tint.
-const heightRamp = (name: string, ramp: [RampPoint, RampPoint]): Layer => ({
-  name,
-  blend: 'multiply',
-  ramp,
-  paint: ({ yn }, k) => {
-    const [h, s, l] = ramp2(1 - verticalFade(yn), ramp[0], ramp[1]);
-    return [h, s, l, k.strength ?? 1];
-  },
-});
-
 // stable stuff reused across hot-reloads
 export interface DemoEffectContext {
   noise4D: NoiseFunction4D;
@@ -61,6 +55,13 @@ export interface DemoEffectContext {
 
 export function createDemoEffectContext(): DemoEffectContext {
   return { noise4D: createNoise4D() };
+}
+
+// Everything a layer kind's paint closes over, resolved once per engine build.
+interface EffectRuntime {
+  noise4D: NoiseFunction4D;
+  focus: Vec3;
+  strands: StrandField;
 }
 
 const bell = (p: number) => Math.pow(Math.max(0, Math.cos(p * Math.PI)), 2);
@@ -565,18 +566,97 @@ const HEIGHT_KNOBS: KnobSchema = {
   },
 };
 
+// The wash is the standalone noise field, coloured through its ramp.
+const noiseWashKind = defineKind<EffectRuntime>({
+  schema: WASH_KNOBS,
+  makePaint:
+    ({ noise4D, focus }) =>
+    ({ xn, yn, zn }, k, ramp) => {
+      const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
+      const amt = threshold(noise4D(sx, sy, sz, k.time), {
+        at: k.thresholdAt,
+        edge: k.thresholdEdge,
+      });
+      const [start, end] = ramp ?? [WASH_RAMP_START, WASH_RAMP_END];
+      const [h, s, l] = ramp2(amt, start, end);
+      return [h, s, l, 1];
+    },
+});
+
+// A slow global brightness pulse, screened over the wash. Period wobbles via noise
+// while staying strictly recurring, so the pulse never reverses — just breathes
+// a little early/late.
+const breatheKind = defineKind<EffectRuntime>({
+  schema: BREATHE_KNOBS,
+  makePaint:
+    ({ noise4D }) =>
+    ({ phase }, k) => {
+      const breathePhase = wrap(
+        k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
+      );
+      const amt = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK) * BREATHE_GAIN;
+      return [0, 0, 1, amt < 0 ? 0 : amt > 1 ? 1 : amt];
+    },
+});
+
+// Colours the layers below by height: samples the ramp on a squared vertical curve
+// (start at the floor, end at the crown) and multiplies it in, so a white start
+// preserves their colour and a tinted end shades toward it. `strength` fades it.
+const heightRampKind = defineKind<EffectRuntime>({
+  schema: HEIGHT_KNOBS,
+  makePaint:
+    () =>
+    ({ yn }, k, ramp) => {
+      const [start, end] = ramp ?? [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP];
+      const [h, s, l] = ramp2(1 - verticalFade(yn), start, end);
+      return [h, s, l, k.strength ?? 1];
+    },
+});
+
+// The rising blobs: an animated 1-D band of noise read along each arch strand,
+// soft-thresholded into coverage, tinted per strand and faded toward the tip.
+const strandBlobsKind = defineKind<EffectRuntime>({
+  schema: BLOB_KNOBS,
+  makePaint:
+    ({ noise4D, strands }) =>
+    ({ index }, k, ramp) => {
+      const sid = strands.id[index];
+      if (sid < 0) return [0, 0, 0, 0];
+      const t = strands.t[index];
+      const h = strands.h[index];
+      const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * h) - 0.2;
+      const v = h ? noise4D(sid * STRAND_SEP, along * k.freq - k.speed, k.time, 0) : 0;
+      const tipFade = 1 - k.tipFade * smoothstep(STRAND_TIP_START, 1, t);
+      const amt = smoothstep(k.threshold - k.edge, k.threshold + k.edge, v) * tipFade;
+      const tint = (hashU(sid, 0, 1) - 0.5) * k.tint;
+      const [start, end] = ramp ?? [BLOB_RAMP_START, BLOB_RAMP_END];
+      const [rh, rs, rl] = ramp2(amt, start, end);
+      return [rh + tint, rs, rl * k.brightness, amt];
+    },
+});
+
+// Breathe and height sit under the blobs, so they colour only the wash while the
+// rising blobs stay pure on top.
+const RISING_BUBBLES: LayerSlot<EffectRuntime>[] = [
+  slot('wash', 'over', noiseWashKind, [WASH_RAMP_START, WASH_RAMP_END]),
+  slot('breathe', 'screen', breatheKind),
+  slot('height', 'multiply', heightRampKind, [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
+  slot('blobs', 'over', strandBlobsKind, [BLOB_RAMP_START, BLOB_RAMP_END]),
+];
+
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
-// persisted per effect. Keys are scoped by layer name; effects absent here have no
-// knobs.
-export const EFFECT_KNOBS: Partial<Record<DemoEffectId, KnobSchema>> = {
-  noise: prefixKeys('blobs', NOISE_KNOBS),
-  'noise-rays': prefixKeys('rays', RAY_KNOBS),
-  'rising-bubbles': {
-    ...prefixKeys('wash', WASH_KNOBS),
-    ...prefixKeys('breathe', BREATHE_KNOBS),
-    ...prefixKeys('height', HEIGHT_KNOBS),
-    ...prefixKeys('blobs', BLOB_KNOBS),
-  },
+// persisted per effect, keyed effect → layer → knob. Effects absent here have no
+// knobs. Non-bubbles effects are single-layer, named to match their built layer.
+export const EFFECT_KNOBS: Partial<Record<DemoEffectId, Record<string, KnobSchema>>> = {
+  noise: { blobs: NOISE_KNOBS },
+  'noise-rays': { rays: RAY_KNOBS },
+  'rising-bubbles': topologySchemas(RISING_BUBBLES),
+};
+
+// Seed ramps for layers that own their ramp as runtime state (bubbles today);
+// other effects keep their ramp baked into paint and expose it only for display.
+export const EFFECT_RAMPS: Partial<Record<DemoEffectId, Record<string, Ramp>>> = {
+  'rising-bubbles': topologyRamps(RISING_BUBBLES),
 };
 
 export function createDemoEffects(
@@ -662,49 +742,6 @@ export function createDemoEffects(
         ];
       }),
     ],
-    // Breathe and height sit under the blobs, so they colour only the wash while
-    // the rising blobs stay pure on top.
-    'rising-bubbles': [
-      solid(
-        'wash',
-        ({ xn, yn, zn }, k) => {
-          const [sx, sy, sz] = focusWarp(xn, yn, zn, focus, k.zoom);
-          const v = noise4D(sx, sy, sz, k.time);
-          const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-          return ramp2(amt, WASH_RAMP_START, WASH_RAMP_END);
-        },
-        [WASH_RAMP_START, WASH_RAMP_END],
-      ),
-      {
-        name: 'breathe',
-        blend: 'screen',
-        paint: ({ phase }, k) => {
-          const breathePhase = wrap(
-            k.breathe + BREATHE_WOBBLE * noise4D(BREATHE_SEED, phase * BREATHE_WOBBLE_RATE, 0, 0),
-          );
-          const amt = k.breatheDepth * asymPulse(breathePhase, BREATHE_ATTACK) * BREATHE_GAIN;
-          return [0, 0, 1, amt < 0 ? 0 : amt > 1 ? 1 : amt];
-        },
-      },
-      heightRamp('height', [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
-      {
-        name: 'blobs',
-        blend: 'over',
-        ramp: [BLOB_RAMP_START, BLOB_RAMP_END],
-        paint: ({ index }, k) => {
-          const sid = strands.id[index];
-          if (sid < 0) return [0, 0, 0, 0];
-          const t = strands.t[index];
-          const h = strands.h[index];
-          const along = Math.sqrt(0.2 * 0.2 + strands.b[index] + t * h) - 0.2;
-          const v = h ? noise4D(sid * STRAND_SEP, along * k.freq - k.speed, k.time, 0) : 0;
-          const tipFade = 1 - k.tipFade * smoothstep(STRAND_TIP_START, 1, t);
-          const amt = smoothstep(k.threshold - k.edge, k.threshold + k.edge, v) * tipFade;
-          const tint = (hashU(sid, 0, 1) - 0.5) * k.tint;
-          const [rh, rs, rl] = ramp2(amt, BLOB_RAMP_START, BLOB_RAMP_END);
-          return [rh + tint, rs, rl * k.brightness, amt];
-        },
-      },
-    ],
+    'rising-bubbles': buildLayers(RISING_BUBBLES, { noise4D, focus, strands }),
   };
 }

@@ -9,6 +9,7 @@ export function mockEffectControl(effect: DemoEffectId): EffectControl {
     setBrightness: noop,
     setBpm: noop,
     setParam: noop,
+    setRamp: noop,
     setRunning: noop,
     cueBeat: noop,
     subscribe(listener) {

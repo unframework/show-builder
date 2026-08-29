@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import type { EffectParams, LayerMeta } from '../effects/controlMessages';
 import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
-import { KNOB_NS, kickCurve, type KnobDef, type Range } from '../effects/knobs';
+import { kickCurve, type Range } from '../effects/knobs';
 
 // A layer's palette as a CSS gradient for the read-only swatch. HSL stops map
 // straight to CSS hsl() (0-1 → deg/%), an approximation of the sim's colour.
@@ -286,22 +286,16 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
 
   const schema = EFFECT_KNOBS[effect];
   if (!schema) return null;
-  const values = params[effect] ?? {};
+  const layerParams = params[effect] ?? {};
 
-  const groups = new Map<string, [string, KnobDef][]>();
-  for (const entry of Object.entries(schema)) {
-    const i = entry[0].indexOf(KNOB_NS);
-    const layer = i < 0 ? '' : entry[0].slice(0, i);
-    const list = groups.get(layer);
-    if (list) list.push(entry);
-    else groups.set(layer, [entry]);
-  }
-  const showLayers = groups.size > 1;
+  const groups = Object.entries(schema);
+  const showLayers = groups.length > 1;
 
   return (
     <>
-      {[...groups].map(([layer, entries]) => {
-        const ramp = layers.find((l) => l.name === layer)?.ramp;
+      {groups.map(([layer, knobs]) => {
+        const values = layerParams[layer]?.knobs ?? {};
+        const ramp = layerParams[layer]?.ramp ?? layers.find((l) => l.name === layer)?.ramp;
         return (
           <Fragment key={layer}>
             {(showLayers || ramp) && (
@@ -320,7 +314,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                 )}
               </div>
             )}
-            {entries.map(([key, def]) => {
+            {Object.entries(knobs).map(([key, def]) => {
               const v = values[key] ?? def.default;
               return (
                 <div key={key} className="flex flex-col gap-1">
@@ -336,14 +330,14 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                     <ScrubValue
                       range={def.base}
                       value={v.base}
-                      onChange={(x) => void source.setParam(effect, key, 'base', x)}
+                      onChange={(x) => void source.setParam(effect, layer, key, 'base', x)}
                       clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
                       size="sm"
                     />
                     <ScrubValue
                       range={def.kick}
                       value={v.kick}
-                      onChange={(x) => void source.setParam(effect, key, 'kick', x)}
+                      onChange={(x) => void source.setParam(effect, layer, key, 'kick', x)}
                       size="sm"
                       tag="k"
                     />

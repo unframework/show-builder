@@ -6,8 +6,47 @@ export const demoEffectId = z.enum(
 );
 
 export const knobValue = z.object({ base: z.number(), kick: z.number() });
-// Per-effect knob values, keyed effect → knob → { base, kick }.
-export const effectParams = z.record(z.string(), z.record(z.string(), knobValue));
+export const rampPoint = z.object({ h: z.number(), s: z.number(), l: z.number() });
+
+// A layer instance's runtime state: its knob values and current ramp.
+export const layerState = z.object({
+  knobs: z.record(z.string(), knobValue),
+  ramp: z.array(rampPoint).optional(),
+});
+
+// Lift persisted params from the old flat `effect → "layer.knob" → value` shape to
+// the nested `effect → layer → { knobs, ramp }` one. Detected by inner values that
+// are bare knob values; unscoped keys (no dot) are dropped.
+function migrateParams(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const out: Record<string, unknown> = {};
+  for (const [effect, layers] of Object.entries(raw as Record<string, unknown>)) {
+    if (!layers || typeof layers !== 'object') {
+      out[effect] = layers;
+      continue;
+    }
+    const entries = Object.entries(layers as Record<string, unknown>);
+    const flat = entries.some(([, v]) => knobValue.safeParse(v).success);
+    if (!flat) {
+      out[effect] = layers;
+      continue;
+    }
+    const nested: Record<string, { knobs: Record<string, unknown> }> = {};
+    for (const [key, v] of entries) {
+      const dot = key.indexOf('.');
+      if (dot < 0) continue;
+      (nested[key.slice(0, dot)] ??= { knobs: {} }).knobs[key.slice(dot + 1)] = v;
+    }
+    out[effect] = nested;
+  }
+  return out;
+}
+
+// Per-effect knob values, keyed effect → layer → { knobs, ramp }.
+export const effectParams = z.preprocess(
+  migrateParams,
+  z.record(z.string(), z.record(z.string(), layerState)),
+);
 export type EffectParams = z.infer<typeof effectParams>;
 
 // Browser control UI → runner.
@@ -20,9 +59,16 @@ export const controlCommand = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('set-param'),
     effect: demoEffectId,
+    layer: z.string(),
     key: z.string(),
     field: z.enum(['base', 'kick']),
     value: z.number(),
+  }),
+  z.object({
+    type: z.literal('set-ramp'),
+    effect: demoEffectId,
+    layer: z.string(),
+    ramp: z.array(rampPoint),
   }),
   z.object({ type: z.literal('set-output'), host: z.string(), port: z.number().int().positive() }),
   z.object({ type: z.literal('cue-beat') }),
@@ -32,7 +78,6 @@ export type ControlCommand = z.infer<typeof controlCommand>;
 // The active effect's layer stack, for display: names, blend modes, and each
 // layer's palette. Static per effect today, but rides the state stream so it's
 // ready to become editable.
-export const rampPoint = z.object({ h: z.number(), s: z.number(), l: z.number() });
 export const layerMeta = z.object({
   name: z.string(),
   blend: z.enum(['over', 'add', 'screen', 'multiply']),
@@ -71,7 +116,7 @@ export const effectResumeState = z.object({
   phase: z.number(),
   beat: z.number(),
   params: effectParams.optional(),
-  phases: z.record(z.string(), z.record(z.string(), z.number())).optional(),
+  phases: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.number()))).optional(),
 });
 export type EffectResumeState = z.infer<typeof effectResumeState>;
 

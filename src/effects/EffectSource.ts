@@ -12,17 +12,13 @@ import {
   createDemoEffectContext,
   createDemoEffects,
   EFFECT_KNOBS,
+  EFFECT_RAMPS,
   type DemoEffectContext,
   type DemoEffectId,
 } from './demoEffects';
-import { paintLayers, type Layer } from './layers';
-import {
-  defaultKnobValues,
-  kickCurve,
-  resolveKnobs,
-  splitByLayer,
-  type ResolvedKnobs,
-} from './knobs';
+import { paintLayers, type Layer, type LayerRuntime, type LayerState } from './layers';
+import { defaultKnobValues, kickCurve, resolveKnobs, type KnobValues } from './knobs';
+import type { Ramp } from './stages';
 
 export type FrameSink = (universe: number, rgb: Float64Array, brightness: number) => void;
 type Listener = (event: EffectEvent) => void;
@@ -38,16 +34,18 @@ export function applyEffectSettings(source: EffectSource, settings: EffectSettin
   if (settings.running !== undefined) source.setRunning(settings.running);
 }
 
-const EMPTY_KNOBS: ResolvedKnobs = {};
-
 // A fresh copy so each emitted state has a new identity (React re-renders on it)
 // and consumers can't mutate the engine's live knob values.
 function cloneParams(params: EffectParams): EffectParams {
   const out: EffectParams = {};
-  for (const [effect, knobs] of Object.entries(params)) {
-    const copy: Record<string, { base: number; kick: number }> = {};
-    for (const [key, v] of Object.entries(knobs)) copy[key] = { base: v.base, kick: v.kick };
-    out[effect] = copy;
+  for (const [effect, layers] of Object.entries(params)) {
+    const layerCopy: Record<string, LayerState> = {};
+    for (const [layer, st] of Object.entries(layers)) {
+      const knobs: KnobValues = {};
+      for (const [key, v] of Object.entries(st.knobs)) knobs[key] = { base: v.base, kick: v.kick };
+      layerCopy[layer] = st.ramp ? { knobs, ramp: st.ramp } : { knobs };
+    }
+    out[effect] = layerCopy;
   }
   return out;
 }
@@ -87,7 +85,7 @@ export class EffectSource {
   private beat = 0;
   private beatNudge = 0;
   private readonly params: EffectParams = {};
-  private readonly phases: Record<string, Record<string, number>> = {};
+  private readonly phases: Record<string, Record<string, Record<string, number>>> = {};
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: FrameSink, resume?: ResumeState) {
     this.pixels = pixels;
@@ -98,9 +96,19 @@ export class EffectSource {
 
     for (const [id, schema] of Object.entries(EFFECT_KNOBS)) {
       if (!schema) continue;
-      this.params[id] = defaultKnobValues(schema);
-      const acc: Record<string, number> = {};
-      for (const key in schema) if (schema[key].type === 'rate') acc[key] = 0;
+      const ramps = EFFECT_RAMPS[id as DemoEffectId];
+      const layers: Record<string, LayerState> = {};
+      const acc: Record<string, Record<string, number>> = {};
+      for (const [layer, knobs] of Object.entries(schema)) {
+        const ramp = ramps?.[layer];
+        layers[layer] = ramp
+          ? { knobs: defaultKnobValues(knobs), ramp }
+          : { knobs: defaultKnobValues(knobs) };
+        const layerAcc: Record<string, number> = {};
+        for (const key in knobs) if (knobs[key].type === 'rate') layerAcc[key] = 0;
+        if (Object.keys(layerAcc).length) acc[layer] = layerAcc;
+      }
+      this.params[id] = layers;
       if (Object.keys(acc).length) this.phases[id] = acc;
     }
 
@@ -165,22 +173,29 @@ export class EffectSource {
     this.beatNudge = 0;
     if (state.params) this.mergeParams(state.params);
     if (state.phases) {
-      for (const [effect, acc] of Object.entries(state.phases)) {
+      for (const [effect, layers] of Object.entries(state.phases)) {
         const target = this.phases[effect];
         if (!target) continue;
-        for (const [key, val] of Object.entries(acc)) {
-          if (key in target) target[key] = val;
+        for (const [layer, acc] of Object.entries(layers)) {
+          const layerAcc = target[layer];
+          if (!layerAcc) continue;
+          for (const [key, val] of Object.entries(acc)) if (key in layerAcc) layerAcc[key] = val;
         }
       }
     }
   }
 
   private mergeParams(incoming: EffectParams): void {
-    for (const [effect, knobs] of Object.entries(incoming)) {
+    for (const [effect, layers] of Object.entries(incoming)) {
       const target = this.params[effect];
       if (!target) continue;
-      for (const [key, value] of Object.entries(knobs)) {
-        if (target[key]) target[key] = { base: value.base, kick: value.kick };
+      for (const [layer, st] of Object.entries(layers)) {
+        const tl = target[layer];
+        if (!tl) continue;
+        for (const [key, value] of Object.entries(st.knobs)) {
+          if (tl.knobs[key]) tl.knobs[key] = { base: value.base, kick: value.kick };
+        }
+        if (st.ramp) tl.ramp = st.ramp;
       }
     }
   }
@@ -230,11 +245,25 @@ export class EffectSource {
     this.notify(this.getState());
   }
 
-  setParam(effect: DemoEffectId, key: string, field: 'base' | 'kick', value: number): void {
-    const knob = this.params[effect]?.[key];
+  setParam(
+    effect: DemoEffectId,
+    layer: string,
+    key: string,
+    field: 'base' | 'kick',
+    value: number,
+  ): void {
+    const knob = this.params[effect]?.[layer]?.knobs[key];
     if (!knob || knob[field] === value) return;
 
     knob[field] = value;
+    this.notify(this.getState());
+  }
+
+  setRamp(effect: DemoEffectId, layer: string, ramp: Ramp): void {
+    const state = this.params[effect]?.[layer];
+    if (!state) return;
+
+    state.ramp = ramp;
     this.notify(this.getState());
   }
 
@@ -250,27 +279,31 @@ export class EffectSource {
     }
   }
 
-  // Resolve the active effect's knobs for this frame: base + beat-kick, then
-  // integrate any rate knobs into their running phase (advanced by dt·speed) and
-  // expose that phase in place of the rate.
-  private resolveActiveKnobs(dt: number): ResolvedKnobs {
+  // Resolve the active effect's knobs for this frame, per layer: base + beat-kick,
+  // then integrate any rate knobs into their running phase (advanced by dt·speed)
+  // and expose that phase in place of the rate. Each layer also carries its ramp.
+  private resolveActiveKnobs(dt: number): Record<string, LayerRuntime> {
     const schema = EFFECT_KNOBS[this.effectId];
-    if (!schema) return EMPTY_KNOBS;
-    const resolved = resolveKnobs(
-      schema,
-      this.params[this.effectId],
-      kickCurve(this.beat, this.bpm),
-    );
-    const acc = this.phases[this.effectId];
-    if (acc) {
-      for (const key in schema) {
-        if (schema[key].type === 'rate') {
-          acc[key] += resolved[key] * dt * this.speed;
-          resolved[key] = acc[key];
+    const params = this.params[this.effectId];
+    if (!schema || !params) return {};
+    const kick = kickCurve(this.beat, this.bpm);
+    const phases = this.phases[this.effectId];
+    const byLayer: Record<string, LayerRuntime> = {};
+    for (const [layer, knobs] of Object.entries(schema)) {
+      const state = params[layer];
+      const resolved = resolveKnobs(knobs, state.knobs, kick);
+      const acc = phases?.[layer];
+      if (acc) {
+        for (const key in knobs) {
+          if (knobs[key].type === 'rate') {
+            acc[key] += resolved[key] * dt * this.speed;
+            resolved[key] = acc[key];
+          }
         }
       }
+      byLayer[layer] = { knobs: resolved, ramp: state.ramp };
     }
-    return resolved;
+    return byLayer;
   }
 
   renderFrame(dt: number): void {
@@ -288,7 +321,7 @@ export class EffectSource {
     this.phase += dt * this.speed;
 
     const layers = this.layers;
-    const knobsByLayer = splitByLayer(this.resolveActiveKnobs(dt));
+    const knobsByLayer = this.resolveActiveKnobs(dt);
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const buf = this.buffers.get(p.universe)!;

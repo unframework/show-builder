@@ -1,25 +1,89 @@
 import { hslToRgb } from './color';
 import type { EffectInput } from './demoEffects';
-import type { ResolvedKnobs } from './knobs';
+import type { KnobSchema, KnobValues, ResolvedKnobs } from './knobs';
 import type { Ramp } from './stages';
 
 export type Hsla = [number, number, number, number];
 
 export type BlendMode = 'over' | 'add' | 'screen' | 'multiply';
 
-// A short name scopes the layer's knobs in the stack, so `paint` reads generic
-// keys. Authored in HSL (+ coverage), but composited in RGB: hue is the wrong
-// space to mix dissimilar colors, and add/screen/multiply only mean anything on
-// light. `ramp` is the palette the layer colours through, surfaced for the UI (a
-// layer whose colour isn't ramp-driven leaves it undefined).
+// Authored in HSL (+ coverage), composited in RGB: hue is the wrong space to mix
+// dissimilar colours, and add/screen/multiply only mean anything on light. Reads
+// generic knobs (the instance name scopes them) plus, for ramp-driven kinds, the
+// current ramp from runtime state.
+export type Paint = (input: EffectInput, knobs: ResolvedKnobs, ramp?: Ramp) => Hsla;
+
+// A composited layer. Blend and identity come from the effect topology. `ramp` is
+// display-only metadata for kinds not yet on the runtime-ramp path; kinds that own
+// their ramp as runtime state leave it undefined and read the ramp `paint` arg.
 export interface Layer {
   name: string;
   blend: BlendMode;
   ramp?: Ramp;
-  paint: (input: EffectInput, knobs: ResolvedKnobs) => Hsla;
+  paint: Paint;
 }
 
-const NO_KNOBS: ResolvedKnobs = {};
+// A reusable layer kind: paint logic coupled with the knob schema paint reads.
+// Name- and blend-agnostic. `schema` is eager (statically knowable); `makePaint`
+// is deferred over the runtime ctx, so schemas derive without it.
+export interface LayerKind<Ctx> {
+  schema: KnobSchema;
+  makePaint: (ctx: Ctx) => Paint;
+}
+
+// One named instance of a kind in an effect's static stack: its blend, plus a
+// default ramp seeding the instance's runtime state.
+export interface LayerSlot<Ctx> {
+  name: string;
+  blend: BlendMode;
+  kind: LayerKind<Ctx>;
+  ramp?: Ramp;
+}
+
+// Per-instance runtime state: knob values and the current ramp.
+export interface LayerState {
+  knobs: KnobValues;
+  ramp?: Ramp;
+}
+
+// Resolved-per-frame runtime a layer paints from.
+export interface LayerRuntime {
+  knobs: ResolvedKnobs;
+  ramp?: Ramp;
+}
+
+export const defineKind = <Ctx>(kind: LayerKind<Ctx>): LayerKind<Ctx> => kind;
+
+export const slot = <Ctx>(
+  name: string,
+  blend: BlendMode,
+  kind: LayerKind<Ctx>,
+  ramp?: Ramp,
+): LayerSlot<Ctx> => ({ name, blend, kind, ramp });
+
+// The effect's namespaced knob schema, keyed by instance name; knob-less kinds
+// drop out so a knob-free effect yields an empty map.
+export function topologySchemas<Ctx>(slots: LayerSlot<Ctx>[]): Record<string, KnobSchema> {
+  const out: Record<string, KnobSchema> = {};
+  for (const { name, kind } of slots) {
+    if (Object.keys(kind.schema).length) out[name] = kind.schema;
+  }
+  return out;
+}
+
+// The seed ramps that runtime state starts from, keyed by instance name.
+export function topologyRamps<Ctx>(slots: LayerSlot<Ctx>[]): Record<string, Ramp> {
+  const out: Record<string, Ramp> = {};
+  for (const { name, ramp } of slots) if (ramp) out[name] = ramp;
+  return out;
+}
+
+// Bind each slot's paint to the runtime ctx. Array order is paint order.
+export function buildLayers<Ctx>(slots: LayerSlot<Ctx>[], ctx: Ctx): Layer[] {
+  return slots.map(({ name, blend, kind }) => ({ name, blend, paint: kind.makePaint(ctx) }));
+}
+
+const NO_RUNTIME: LayerRuntime = { knobs: {} };
 
 // Composite the stack bottom→top into `out` at `ch0`, in linear RGB. The floor is
 // black, so the bottom layer resolves to its own color under any blend mode.
@@ -30,13 +94,14 @@ export function paintLayers(
   ch0: number,
   layers: Layer[],
   input: EffectInput,
-  knobsByLayer: Record<string, ResolvedKnobs>,
+  byLayer: Record<string, LayerRuntime>,
 ): void {
   let r = 0;
   let g = 0;
   let b = 0;
   for (const layer of layers) {
-    const [h, s, l, a] = layer.paint(input, knobsByLayer[layer.name] ?? NO_KNOBS);
+    const rt = byLayer[layer.name] ?? NO_RUNTIME;
+    const [h, s, l, a] = layer.paint(input, rt.knobs, rt.ramp);
     if (a <= 0) continue;
     const [tr, tg, tb] = hslToRgb(h, s, l);
     switch (layer.blend) {
