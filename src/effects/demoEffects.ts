@@ -17,7 +17,7 @@ import {
   type Ramp,
   type RampPoint,
 } from './stages';
-import type { KnobSchema, ResolvedKnobs } from './knobs';
+import type { KnobSchema } from './knobs';
 import type { Vec3 } from '../scene/coords';
 import type { PixelDescriptor } from '../scene/normalize';
 import type { ZoneId } from '../scene/zones';
@@ -34,20 +34,6 @@ export interface EffectInput {
   twinkleOffset: number;
 }
 
-type Paint = (input: EffectInput, knobs: ResolvedKnobs) => [number, number, number];
-
-// The common case: one fully opaque layer that owns the whole pixel. An effect
-// with no layers ("zone") paints each pixel its fixed zone color instead.
-const solid = (name: string, paint: Paint, ramp?: Ramp): Layer => ({
-  name,
-  blend: 'over',
-  ramp,
-  paint: (input, knobs) => {
-    const [h, s, l] = paint(input, knobs);
-    return [h, s, l, 1];
-  },
-});
-
 // stable stuff reused across hot-reloads
 export interface DemoEffectContext {
   noise4D: NoiseFunction4D;
@@ -62,11 +48,15 @@ interface EffectRuntime {
   noise4D: NoiseFunction4D;
   focus: Vec3;
   strands: StrandField;
+  rings: RingSample[];
 }
 
 const bell = (p: number) => Math.pow(Math.max(0, Math.cos(p * Math.PI)), 2);
 const wrap = (x: number) => ((x % 1) + 1) % 1;
-const band = (p: number) => 0.03 + 0.52 * bell(p);
+// A cosine-bell crest travelling along a scalar coordinate: `freq` crests per
+// unit, slid by `offset` (an integrated scroll phase plus any beat shove).
+const travelingBand = (coord: number, freq: number, offset: number) =>
+  bell(wrap(coord * freq - offset));
 // Angular gap (radians) to the nearest arm of a two-armed axis through the origin:
 // folded into [0, π/2] so a direction and its opposite read identically.
 const axisGap = (a: number) => {
@@ -97,6 +87,10 @@ const NOISE_RAMP_END: RampPoint = { h: 0.05, s: 1, l: 0.5 };
 // at the crown — the height colouring the standalone noise effect layers on top.
 const NOISE_HEIGHT_RAMP_FLOOR: RampPoint = { h: 0.9, s: 0.5, l: 0.85 };
 const NOISE_HEIGHT_RAMP_CROWN: RampPoint = { h: 0, s: 0, l: 1 };
+// The beat pulse multiplies its ramp over the field: white at rest (a no-op) so
+// only the downbeat throbs, deepening toward a warm core at the flash's peak.
+const NOISE_FLASH_RAMP_LOW: RampPoint = { h: 0, s: 0, l: 1 };
+const NOISE_FLASH_RAMP_HIGH: RampPoint = { h: 0.03, s: 0.9, l: 0.5 };
 const NOISE_KICK_LIGHT = 0.2;
 // Feature count across the unit sphere the rays pierce. Smaller = fewer, broader shafts.
 const RAY_NOISE_SCALE = 3;
@@ -175,9 +169,12 @@ const PULSE_SEED = 41;
 const PULSE_RAMP_LOW: RampPoint = { h: 0, s: 0, l: 0 };
 const PULSE_RAMP_HIGH: RampPoint = { h: 0, s: 0, l: 1 };
 // The bubbles breathe instance: LFO period (phase units, ~seconds at speed 1) and
-// its swell depth (peak screen coverage).
+// its swell depth (peak coverage). It multiplies its ramp over the wash, so the
+// ramp is white at rest (a no-op) and deepens to a cool blue at the breath's peak.
 const BREATHE_PERIOD = 8;
 const BREATHE_SWELL = 0.6;
+const BREATHE_RAMP_LOW: RampPoint = { h: 0, s: 0, l: 1 };
+const BREATHE_RAMP_HIGH: RampPoint = { h: 0.62, s: 0.6, l: 0.5 };
 const BUBBLE_L = 0.95;
 // The two-point HSL ramps each bubble layer colours through — the swappable
 // "palette" unit. The wash runs dim→brighter blue over its noise coverage; the
@@ -426,12 +423,6 @@ const RAY_KNOBS: KnobSchema = {
     kick: { min: -0.5, max: 0.5, step: 0.001 },
     default: { base: NOISE_EDGE, kick: 0 },
   },
-  lightGain: {
-    label: 'brightness',
-    base: { min: 0, max: 2, step: 0.01 },
-    kick: { min: -1, max: 2, step: 0.01 },
-    default: { base: 1, kick: RAY_KICK_LIGHT },
-  },
   heightHue: {
     label: 'height hue',
     base: { min: -1, max: 1, step: 0.01 },
@@ -538,6 +529,136 @@ const HEIGHT_KNOBS: KnobSchema = {
   },
 };
 
+// A travelling crest along one coordinate: `scroll` integrates into the slide
+// (sign picks direction) and `freq` sets the crest spacing. Colour rides the ramp
+// over the crest, so each sweep instance just supplies a coordinate + palette.
+const SWEEP_KNOBS: KnobSchema = {
+  scroll: {
+    label: 'scroll',
+    type: 'rate',
+    base: { min: -2, max: 2, step: 0.01 },
+    kick: { min: -2, max: 2, step: 0.01 },
+    default: { base: 0.25, kick: 0 },
+  },
+  freq: {
+    label: 'density',
+    base: { min: 0.25, max: 8, step: 0.05 },
+    kick: { min: -4, max: 4, step: 0.05 },
+    default: { base: 1, kick: 0 },
+  },
+};
+// Each sweep's two-point ramp runs a fixed hue dim → bright over the crest.
+const LR_SWEEP_RAMP: Ramp = [
+  { h: 0.08, s: 0.95, l: 0.03 },
+  { h: 0.08, s: 0.95, l: 0.55 },
+];
+const RISE_RAMP: Ramp = [
+  { h: 0.7, s: 0.9, l: 0.03 },
+  { h: 0.7, s: 0.9, l: 0.55 },
+];
+const FB_SWEEP_RAMP: Ramp = [
+  { h: 0.5, s: 0.9, l: 0.03 },
+  { h: 0.5, s: 0.9, l: 0.55 },
+];
+const RADIAL_RAMP: Ramp = [
+  { h: 0.87, s: 0.9, l: 0.03 },
+  { h: 0.87, s: 0.9, l: 0.55 },
+];
+
+// Per-pixel sparkle: each pixel's random offset phase-shifts a cubed sine so
+// neighbours brighten out of step, with a small intrinsic hue/sat jitter on top.
+const TWINKLE_KNOBS: KnobSchema = {
+  rate: {
+    label: 'rate',
+    type: 'rate',
+    base: { min: 0, max: 6, step: 0.05 },
+    kick: { min: -4, max: 4, step: 0.05 },
+    default: { base: 2.5, kick: 0 },
+  },
+  power: {
+    label: 'sharpness',
+    base: { min: 1, max: 8, step: 0.1 },
+    kick: { min: -4, max: 4, step: 0.1 },
+    default: { base: 3, kick: 0 },
+  },
+  hueJitter: {
+    label: 'hue jitter',
+    base: { min: 0, max: 0.5, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.01 },
+    default: { base: 0.06, kick: 0 },
+  },
+  satJitter: {
+    label: 'sat jitter',
+    base: { min: 0, max: 0.5, step: 0.01 },
+    kick: { min: -0.5, max: 0.5, step: 0.01 },
+    default: { base: 0.25, kick: 0 },
+  },
+};
+const TWINKLE_RAMP: Ramp = [
+  { h: 0.06, s: 0.75, l: 0.02 },
+  { h: 0.06, s: 0.75, l: 0.57 },
+];
+
+// Concentric crests rippling out of the rose window: `freq` rings per unit
+// distance, `scroll` their outward drift, `expand` the extra shove on each beat.
+const RING_KNOBS: KnobSchema = {
+  freq: {
+    label: 'rings',
+    base: { min: 4, max: 40, step: 0.5 },
+    kick: { min: -20, max: 20, step: 0.5 },
+    default: { base: RING_FREQ, kick: 0 },
+  },
+  scroll: {
+    label: 'drift',
+    type: 'rate',
+    base: { min: -6, max: 6, step: 0.05 },
+    kick: { min: -4, max: 4, step: 0.05 },
+    default: { base: RING_SPEED, kick: 0 },
+  },
+  expand: {
+    label: 'kick expand',
+    base: { min: 0, max: 2, step: 0.02 },
+    kick: { min: -2, max: 2, step: 0.02 },
+    default: { base: RING_EXPAND, kick: 0 },
+  },
+};
+const RING_RIPPLE_RAMP: Ramp = [
+  { h: 0.37, s: 0.9, l: 0.04 },
+  { h: 0.46, s: 0.9, l: 0.55 },
+];
+
+// A two-armed beam rotating through the facade plane and blooming where it
+// crosses the rings: `speed` its spin (radians/beat), `width` its half-angle,
+// `gain` its brightness. Fixed downbeat phase offset keeps it clear of the crest.
+const SEARCH_OFFSET = 0.55;
+const SEARCH_KNOBS: KnobSchema = {
+  speed: {
+    label: 'beam speed',
+    base: { min: 0, max: 2 * Math.PI, step: 0.05 },
+    kick: { min: -Math.PI, max: Math.PI, step: 0.05 },
+    default: { base: SEARCH_SPEED, kick: 0 },
+  },
+  width: {
+    label: 'beam width',
+    base: { min: 0.05, max: 1.5, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: SEARCH_WIDTH, kick: 0 },
+  },
+  gain: {
+    label: 'beam gain',
+    base: { min: 0, max: 1, step: 0.01 },
+    kick: { min: -1, max: 1, step: 0.01 },
+    default: { base: SEARCH_GAIN, kick: 0 },
+  },
+};
+const SEARCH_RAMP: Ramp = [
+  { h: 0.55, s: 0.5, l: 0 },
+  { h: 0.5, s: 0.3, l: 0.95 },
+];
+// The beat brightness screened over the noise rays, replacing the old baked gain.
+const RAY_FLASH_RAMP_LOW: RampPoint = { h: 0.03, s: 0.9, l: 0 };
+const RAY_FLASH_RAMP_HIGH: RampPoint = { h: 0.05, s: 0.6, l: 0.9 };
+
 // A focus-warped noise field soft-thresholded into coverage and coloured through
 // its ramp — the opaque base of both the bubbles wash and the noise effect.
 const noiseFieldKind = defineKind<EffectRuntime>({
@@ -614,11 +735,138 @@ const strandBlobsKind = defineKind<EffectRuntime>({
     },
 });
 
+// The four sweeps differ only in the coordinate the crest travels along; lr runs
+// the opposite way, so it negates the shared scroll.
+const lrSweepKind = defineKind<EffectRuntime>({
+  schema: SWEEP_KNOBS,
+  makePaint:
+    () =>
+    ({ xn }, k, ramp) => {
+      const [start, end] = ramp ?? LR_SWEEP_RAMP;
+      const [h, s, l] = ramp2(travelingBand(xn, k.freq, -k.scroll), start, end);
+      return [h, s, l, 1];
+    },
+});
+
+const riseKind = defineKind<EffectRuntime>({
+  schema: SWEEP_KNOBS,
+  makePaint:
+    () =>
+    ({ yn }, k, ramp) => {
+      const [start, end] = ramp ?? RISE_RAMP;
+      const [h, s, l] = ramp2(travelingBand(yn, k.freq, k.scroll), start, end);
+      return [h, s, l, 1];
+    },
+});
+
+const fbSweepKind = defineKind<EffectRuntime>({
+  schema: SWEEP_KNOBS,
+  makePaint:
+    () =>
+    ({ zn }, k, ramp) => {
+      const [start, end] = ramp ?? FB_SWEEP_RAMP;
+      const [h, s, l] = ramp2(travelingBand(zn, k.freq, k.scroll), start, end);
+      return [h, s, l, 1];
+    },
+});
+
+const radialKind = defineKind<EffectRuntime>({
+  schema: SWEEP_KNOBS,
+  makePaint:
+    () =>
+    ({ xn, zn }, k, ramp) => {
+      const d = Math.hypot(xn - 0.5, zn - 0.5) * Math.SQRT2;
+      const [start, end] = ramp ?? RADIAL_RAMP;
+      const [h, s, l] = ramp2(travelingBand(d, k.freq, k.scroll), start, end);
+      return [h, s, l, 1];
+    },
+});
+
+const twinkleKind = defineKind<EffectRuntime>({
+  schema: TWINKLE_KNOBS,
+  makePaint:
+    () =>
+    ({ twinkleOffset }, k, ramp) => {
+      const b = Math.pow(0.5 + 0.5 * Math.sin(k.rate + twinkleOffset), k.power);
+      const [start, end] = ramp ?? TWINKLE_RAMP;
+      const [h, s, l] = ramp2(b, start, end);
+      return [
+        h + k.hueJitter * Math.sin(twinkleOffset * 5),
+        s + k.satJitter * Math.cos(twinkleOffset * 3),
+        l,
+        1,
+      ];
+    },
+});
+
+// Thresholded simplex shafts fired radially from the focus, with a slow hue spin
+// and a height hue tint baked into the ray look; the beat brightness lives in a
+// sibling pulse layer.
+const raysFieldKind = defineKind<EffectRuntime>({
+  schema: RAY_KNOBS,
+  makePaint: ({ noise4D, focus }) => {
+    const [fx, fy, fz] = focus;
+    return ({ xn, yn, zn, phase }, k, ramp) => {
+      const dx = Math.abs(xn - fx);
+      const dy = yn - fy;
+      const dz = (zn - fz) * k.depth;
+      const r = Math.hypot(dx, dy, dz) || 1;
+      const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
+      const v = noise4D(
+        (dx / r) * k.zoom * detail,
+        (dy / r) * k.zoom - k.rise,
+        (dz / r) * k.zoom,
+        k.time,
+      );
+      const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
+      const [start, end] = ramp ?? [RAY_RAMP_START, RAY_RAMP_END];
+      const [h, s, l] = ramp2(amt, start, end);
+      return [
+        h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
+        s,
+        l,
+        1,
+      ];
+    };
+  },
+});
+
+// The rose-ring ripple: a crest travelling out along each pixel's precomputed
+// focus distance, shoved outward on the beat, faded to black past the reach.
+const ringsRippleKind = defineKind<EffectRuntime>({
+  schema: RING_KNOBS,
+  makePaint:
+    ({ rings }) =>
+    ({ index, phase, beat, bpm }, k, ramp) => {
+      const { r, fade } = rings[index];
+      const kick = beatSpike(beat, bpm, PULSE_DECAY);
+      const crest = travelingBand(r, k.freq, k.scroll + k.expand * kick);
+      const [start, end] = ramp ?? RING_RIPPLE_RAMP;
+      const [h, s, l] = ramp2(crest, start, end);
+      return [h + 0.08 * Math.sin(phase * 0.3), s, l * (1 + 0.7 * kick), fade];
+    },
+});
+
+// The searchlight beam, blooming where the sweeping axis crosses the rings.
+const searchlightKind = defineKind<EffectRuntime>({
+  schema: SEARCH_KNOBS,
+  makePaint:
+    ({ rings }) =>
+    ({ index, beat, bpm }, k, ramp) => {
+      const { angle } = rings[index];
+      const kick = beatSpike(beat, bpm, PULSE_DECAY);
+      const beam = 1 - smoothstep(0, k.width, axisGap(angle - (beat - SEARCH_OFFSET) * k.speed));
+      const [start, end] = ramp ?? SEARCH_RAMP;
+      const [h, s, l] = ramp2(beam, start, end);
+      return [h, s, l, (k.gain + 0.15 * kick) * beam];
+    },
+});
+
 // Breathe and height sit under the blobs, so they colour only the wash while the
 // rising blobs stay pure on top.
 const RISING_BUBBLES: LayerSlot<EffectRuntime>[] = [
   slot('wash', 'over', noiseFieldKind, [WASH_RAMP_START, WASH_RAMP_END]),
-  slot('breathe', 'screen', pulseKind, [PULSE_RAMP_LOW, PULSE_RAMP_HIGH], {
+  slot('breathe', 'multiply', pulseKind, [BREATHE_RAMP_LOW, BREATHE_RAMP_HIGH], {
     rate: { base: 1 / BREATHE_PERIOD },
     swell: { base: BREATHE_SWELL },
   }),
@@ -637,24 +885,58 @@ const NOISE_BLOBS: LayerSlot<EffectRuntime>[] = [
     thresholdEdge: { base: NOISE_EDGE },
   }),
   slot('height', 'multiply', heightRampKind, [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
-  slot('bright', 'screen', pulseKind, [PULSE_RAMP_LOW, PULSE_RAMP_HIGH], {
+  slot('bright', 'multiply', pulseKind, [NOISE_FLASH_RAMP_LOW, NOISE_FLASH_RAMP_HIGH], {
     flash: { kick: NOISE_KICK_LIGHT },
   }),
 ];
 
+const LR_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', lrSweepKind, LR_SWEEP_RAMP)];
+const RISE: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', riseKind, RISE_RAMP)];
+const FB_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', fbSweepKind, FB_SWEEP_RAMP)];
+const RADIAL: LayerSlot<EffectRuntime>[] = [slot('pulse', 'over', radialKind, RADIAL_RAMP)];
+const TWINKLE: LayerSlot<EffectRuntime>[] = [slot('twinkle', 'over', twinkleKind, TWINKLE_RAMP)];
+
+// The rays field plus its beat-brightness flash, screened on so the downbeat
+// blooms rather than tints.
+const NOISE_RAYS: LayerSlot<EffectRuntime>[] = [
+  slot('rays', 'over', raysFieldKind, [RAY_RAMP_START, RAY_RAMP_END]),
+  slot('bright', 'screen', pulseKind, [RAY_FLASH_RAMP_LOW, RAY_FLASH_RAMP_HIGH], {
+    flash: { kick: RAY_KICK_LIGHT },
+  }),
+];
+
+// Ripple base with the searchlight bloomed on top.
+const RINGS: LayerSlot<EffectRuntime>[] = [
+  slot('rings', 'over', ringsRippleKind, RING_RIPPLE_RAMP),
+  slot('beam', 'screen', searchlightKind, SEARCH_RAMP),
+];
+
 // Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
 // persisted per effect, keyed effect → layer → knob. Effects absent here have no
-// knobs. noise-rays is still single-layer, named to match its built layer.
+// knobs.
 export const EFFECT_KNOBS: Partial<Record<DemoEffectId, Record<string, KnobSchema>>> = {
+  'lr-sweep': topologySchemas(LR_SWEEP),
+  rise: topologySchemas(RISE),
+  'fb-sweep': topologySchemas(FB_SWEEP),
+  radial: topologySchemas(RADIAL),
+  twinkle: topologySchemas(TWINKLE),
   noise: topologySchemas(NOISE_BLOBS),
-  'noise-rays': { rays: RAY_KNOBS },
+  'noise-rays': topologySchemas(NOISE_RAYS),
+  rings: topologySchemas(RINGS),
   'rising-bubbles': topologySchemas(RISING_BUBBLES),
 };
 
 // Seed ramps for layers that own their ramp as runtime state; other effects keep
 // their ramp baked into paint and expose it only for display.
 export const EFFECT_RAMPS: Partial<Record<DemoEffectId, Record<string, Ramp>>> = {
+  'lr-sweep': topologyRamps(LR_SWEEP),
+  rise: topologyRamps(RISE),
+  'fb-sweep': topologyRamps(FB_SWEEP),
+  radial: topologyRamps(RADIAL),
+  twinkle: topologyRamps(TWINKLE),
   noise: topologyRamps(NOISE_BLOBS),
+  'noise-rays': topologyRamps(NOISE_RAYS),
+  rings: topologyRamps(RINGS),
   'rising-bubbles': topologyRamps(RISING_BUBBLES),
 };
 
@@ -663,72 +945,19 @@ export function createDemoEffects(
   pixels: PixelDescriptor[],
   focus: Vec3,
 ): Record<DemoEffectId, Layer[] | undefined> {
-  const [fx, fy, fz] = focus;
   const rings = ringField(pixels, focus);
   const strands = strandField(pixels);
+  const ctx: EffectRuntime = { noise4D, focus, strands, rings };
   return {
     zone: undefined,
-    'lr-sweep': [solid('sweep', ({ xn, phase }) => [0.08, 0.95, band(wrap(xn + phase * 0.25))])],
-    rise: [solid('rise', ({ yn, phase }) => [0.7, 0.9, band(wrap(yn - phase * 0.25))])],
-    'fb-sweep': [solid('sweep', ({ zn, phase }) => [0.5, 0.9, band(wrap(zn - phase * 0.25))])],
-    radial: [
-      solid('pulse', ({ xn, zn, phase }) => {
-        const d = Math.hypot(xn - 0.5, zn - 0.5) * Math.SQRT2;
-        return [0.87, 0.9, band(wrap(d - phase * 0.25))];
-      }),
-    ],
-    twinkle: [
-      solid('twinkle', ({ phase, twinkleOffset }) => {
-        const b = Math.pow(0.5 + 0.5 * Math.sin(phase * 2.5 + twinkleOffset), 3);
-        return [
-          0.06 + 0.06 * Math.sin(twinkleOffset * 5),
-          0.75 + 0.25 * Math.cos(twinkleOffset * 3),
-          0.02 + 0.55 * b,
-        ];
-      }),
-    ],
-    noise: buildLayers(NOISE_BLOBS, { noise4D, focus, strands }),
-    'noise-rays': [
-      solid(
-        'rays',
-        ({ xn, yn, zn, phase }, k) => {
-          const dx = Math.abs(xn - fx);
-          const dy = yn - fy;
-          const dz = (zn - fz) * k.depth;
-          const r = Math.hypot(dx, dy, dz) || 1;
-          const detail = k.detailFloor + (1 - k.detailFloor) * 0.5 * (1 + dy / r);
-          const v = noise4D(
-            (dx / r) * k.zoom * detail,
-            (dy / r) * k.zoom - k.rise,
-            (dz / r) * k.zoom,
-            k.time,
-          );
-          const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
-          const [h, s, l] = ramp2(amt, RAY_RAMP_START, RAY_RAMP_END);
-          return [
-            h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
-            s,
-            l * k.lightGain,
-          ];
-        },
-        [RAY_RAMP_START, RAY_RAMP_END],
-      ),
-    ],
-    rings: [
-      solid('rings', ({ index, phase, beat, bpm }) => {
-        const { r, fade, angle } = rings[index];
-        const kick = beatSpike(beat, bpm, PULSE_DECAY);
-        const crest = bell(wrap(r * RING_FREQ - phase * RING_SPEED - kick * RING_EXPAND));
-
-        const beam = 1 - smoothstep(0, SEARCH_WIDTH, axisGap(angle - (beat - 0.55) * SEARCH_SPEED));
-
-        return [
-          0.37 + 0.09 * crest + 0.08 * Math.sin(phase * 0.3) + 0.1 * beam,
-          0.9 - 0.2 * beam,
-          (0.04 + (0.5 + 0.35 * kick) * crest) * fade + (SEARCH_GAIN + 0.15 * kick) * beam, // TODO: try negative!
-        ];
-      }),
-    ],
-    'rising-bubbles': buildLayers(RISING_BUBBLES, { noise4D, focus, strands }),
+    'lr-sweep': buildLayers(LR_SWEEP, ctx),
+    rise: buildLayers(RISE, ctx),
+    'fb-sweep': buildLayers(FB_SWEEP, ctx),
+    radial: buildLayers(RADIAL, ctx),
+    twinkle: buildLayers(TWINKLE, ctx),
+    noise: buildLayers(NOISE_BLOBS, ctx),
+    'noise-rays': buildLayers(NOISE_RAYS, ctx),
+    rings: buildLayers(RINGS, ctx),
+    'rising-bubbles': buildLayers(RISING_BUBBLES, ctx),
   };
 }

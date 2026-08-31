@@ -4,9 +4,11 @@ import type { EffectParams, LayerMeta } from '../effects/controlMessages';
 import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
 import { kickCurve, type Range } from '../effects/knobs';
+import { PALETTES, rampsEqual } from '../effects/palettes';
+import type { Ramp } from '../effects/stages';
 
-// A layer's palette as a CSS gradient for the read-only swatch. HSL stops map
-// straight to CSS hsl() (0-1 → deg/%), an approximation of the sim's colour.
+// A layer's palette as a CSS gradient swatch. HSL stops map straight to CSS
+// hsl() (0-1 → deg/%), an approximation of the sim's colour.
 const rampCss = (ramp: NonNullable<LayerMeta['ramp']>) => {
   const stops = ramp.map((p, i) => {
     const pos = ramp.length === 1 ? 0 : (i / (ramp.length - 1)) * 100;
@@ -14,6 +16,47 @@ const rampCss = (ramp: NonNullable<LayerMeta['ramp']>) => {
   });
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 };
+
+function RampPicker({
+  ramp,
+  onPick,
+}: {
+  ramp: NonNullable<LayerMeta['ramp']>;
+  onPick: (ramp: Ramp) => void;
+}) {
+  return (
+    <details className="dropdown">
+      <summary
+        className="h-3 w-16 cursor-pointer list-none rounded-sm border border-base-content/20 hover:border-warning"
+        style={{ background: rampCss(ramp) }}
+        title="palette"
+      />
+      <ul className="dropdown-content menu z-50 mt-1 max-h-72 w-44 flex-nowrap overflow-y-auto rounded-lg border border-base-content/10 bg-base-200 p-1 shadow-lg">
+        {PALETTES.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              className={clsx(
+                'flex items-center gap-2 px-2 py-1',
+                rampsEqual(ramp, p.ramp) && 'border border-warning',
+              )}
+              onClick={(e) => {
+                onPick(p.ramp);
+                e.currentTarget.closest('details')?.removeAttribute('open');
+              }}
+            >
+              <span
+                className="h-3 w-8 shrink-0 rounded-sm"
+                style={{ background: rampCss(p.ramp) }}
+              />
+              <span className="text-xs">{p.name}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 // Pixels of travel before the drag axis locks; the lock point (not the initial
 // press) is the reference the value scrubs from.
@@ -306,11 +349,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                   </span>
                 )}
                 {ramp && ramp.length > 0 && (
-                  <span
-                    className="h-2 w-16 rounded-sm"
-                    style={{ background: rampCss(ramp) }}
-                    title="palette (read-only)"
-                  />
+                  <RampPicker ramp={ramp} onPick={(r) => void source.setRamp(effect, layer, r)} />
                 )}
               </div>
             )}
