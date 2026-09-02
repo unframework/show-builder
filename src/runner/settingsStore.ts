@@ -6,12 +6,14 @@ import { effectSettings } from '../effects/controlMessages';
 const FILE = 'settings.json';
 const SAVE_DEBOUNCE_MS = 750;
 
-// The subset of runner state that survives a restart: the sACN destination plus
-// the persisted effect knobs. Every field is optional so a partial or older file
-// still loads.
+// The subset of runner state that survives a restart: each output protocol's
+// destination kept independently, plus the persisted effect knobs. Every field is
+// optional so a partial or older file still loads.
 export const runnerSettings = effectSettings.extend({
   sacnHost: z.string().optional(),
   sacnPort: z.number().int().positive().optional(),
+  ddpHost: z.string().optional(),
+  ddpPort: z.number().int().positive().optional(),
 });
 export type RunnerSettings = z.infer<typeof runnerSettings>;
 

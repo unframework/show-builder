@@ -3,7 +3,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEffectSettings, EffectSource } from '../effects/EffectSource';
 import { toRgbBytes } from '../effects/frameOutput';
+import { DdpOutput } from '../relay/ddp';
 import { SacnOutput } from '../relay/e131';
+import type { PixelOutput } from '../relay/pixelOutput';
 import { ROSE_CENTER_WORLD } from '../scene/build/roseWindow';
 import type { Vec3 } from '../scene/coords';
 import type { Led, LedScene } from '../scene/ledScene';
@@ -18,8 +20,12 @@ import { createSettingsSaver, loadSettings, resolveStateDir } from './settingsSt
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PIXEL_MAP_DIR = process.env.PIXEL_MAP_DIR ?? join(REPO_ROOT, 'pixel-map');
 const UI_DIR = process.env.RUNNER_UI_DIR ?? join(REPO_ROOT, 'dist');
-const SACN_HOST = process.env.SACN_HOST ?? '127.0.0.1';
-const SACN_PORT = Number(process.env.SACN_PORT ?? 5568);
+const OUTPUT_PROTOCOL = process.env.RUNNER_OUTPUT?.toLowerCase() === 'sacn' ? 'sacn' : 'ddp';
+const DEFAULT_PORT = OUTPUT_PROTOCOL === 'ddp' ? 4048 : 5568;
+const HOST_KEY = OUTPUT_PROTOCOL === 'ddp' ? 'ddpHost' : 'sacnHost';
+const PORT_KEY = OUTPUT_PROTOCOL === 'ddp' ? 'ddpPort' : 'sacnPort';
+const ENV_OUTPUT_HOST = process.env.RUNNER_OUTPUT_HOST ?? process.env.SACN_HOST;
+const ENV_OUTPUT_PORT = process.env.RUNNER_OUTPUT_PORT ?? process.env.SACN_PORT;
 const RUNNER_HOST = process.env.RUNNER_HOST ?? '0.0.0.0';
 const RUNNER_PORT = Number(process.env.RUNNER_PORT ?? 3002);
 const FPS = Number(process.env.RUNNER_FPS ?? 40);
@@ -114,7 +120,12 @@ async function main(): Promise<void> {
   const saved = await loadSettings(stateDir);
   const saver = createSettingsSaver(stateDir);
 
-  const output = new SacnOutput(saved.sacnHost ?? SACN_HOST, saved.sacnPort ?? SACN_PORT);
+  const startHost = saved[HOST_KEY] ?? ENV_OUTPUT_HOST ?? '127.0.0.1';
+  const startPort = saved[PORT_KEY] ?? Number(ENV_OUTPUT_PORT ?? DEFAULT_PORT);
+  const output: PixelOutput =
+    OUTPUT_PROTOCOL === 'ddp'
+      ? new DdpOutput(startHost, startPort)
+      : new SacnOutput(startHost, startPort);
   const expander = await loadPetalExpander(PIXEL_MAP_DIR);
   const source = new EffectSource(
     pixels,
@@ -126,7 +137,17 @@ async function main(): Promise<void> {
   const persist = (): void => {
     const { host, port } = output.destination;
     const { effect, running, speed, brightness, bpm, params } = source.getState();
-    saver.save({ sacnHost: host, sacnPort: port, effect, running, speed, brightness, bpm, params });
+    saver.save({
+      ...saved,
+      [HOST_KEY]: host,
+      [PORT_KEY]: port,
+      effect,
+      running,
+      speed,
+      brightness,
+      bpm,
+      params,
+    });
   };
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {
@@ -149,9 +170,12 @@ async function main(): Promise<void> {
     output,
     onPersist: persist,
   });
-  const { host: sacnHost, port: sacnPort } = output.destination;
+  const { host: outHost, port: outPort } = output.destination;
   const rose = expander ? ' + rose petal expansion (u76–u139)' : '';
-  console.log(`[runner] ${pixels.length} pixels → sACN ${sacnHost}:${sacnPort} @ ${FPS}fps${rose}`);
+  const proto = OUTPUT_PROTOCOL.toUpperCase();
+  console.log(
+    `[runner] ${pixels.length} pixels → ${proto} ${outHost}:${outPort} @ ${FPS}fps${rose}`,
+  );
 }
 
 void main().catch((err) => {

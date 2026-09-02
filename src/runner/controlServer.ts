@@ -5,7 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { controlCommand, type ControlOutput, type EffectEvent } from '../effects/controlMessages';
 import type { EffectSource } from '../effects/EffectSource';
-import type { SacnOutput } from '../relay/e131';
+import type { PixelOutput } from '../relay/pixelOutput';
 
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -21,7 +21,7 @@ export interface ControlServerOptions {
   port: number;
   uiDir: string;
   source: EffectSource;
-  output: SacnOutput;
+  output: PixelOutput;
   onPersist: () => void;
 }
 

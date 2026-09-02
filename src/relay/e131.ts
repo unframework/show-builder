@@ -1,4 +1,4 @@
-import { createSocket, type Socket } from 'node:dgram';
+import { UdpPixelOutput } from './pixelOutput';
 
 // E1.31 (sACN) packet builder — matches relay.js's validation exactly (and
 // mirrors relay/fseq-player.js so the relay receives runner frames identically).
@@ -20,33 +20,14 @@ export function buildDataPacket(universe: number, sequence: number, dmx: Uint8Ar
   return packet;
 }
 
-// UDP sink for EffectSource: one sACN packet per universe per frame, with a
-// per-universe rolling sequence number as the protocol requires.
-export class SacnOutput {
-  private readonly socket: Socket = createSocket('udp4');
+// One sACN packet per universe per frame, with a per-universe rolling sequence
+// number as the protocol requires.
+export class SacnOutput extends UdpPixelOutput {
   private readonly sequence = new Map<number, number>();
-
-  constructor(
-    private host: string,
-    private port: number,
-  ) {}
-
-  get destination(): { host: string; port: number } {
-    return { host: this.host, port: this.port };
-  }
-
-  setDestination(host: string, port: number): void {
-    this.host = host;
-    this.port = port;
-  }
 
   emit = (universe: number, bytes: Uint8Array): void => {
     const seq = ((this.sequence.get(universe) ?? 0) + 1) & 0xff;
     this.sequence.set(universe, seq);
     this.socket.send(buildDataPacket(universe, seq, bytes), this.port, this.host);
   };
-
-  close(): void {
-    this.socket.close();
-  }
 }

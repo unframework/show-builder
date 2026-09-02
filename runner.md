@@ -6,7 +6,7 @@ it in the 3D sim, or point it at the real hardware.
 
 ## Locally
 
-- `npm run runner` — control UI on http://localhost:3002, sACN to `127.0.0.1:5568`.
+- `npm run runner` — control UI on http://localhost:3002, DDP to `127.0.0.1:4048`. Add `RUNNER_OUTPUT=sacn` to stream sACN (`127.0.0.1:5568`) for the relay/sim instead.
 - `npm run build:runner` — bundle a dependency-free `dist-runner/` (server + UI +
   pixel-map); copy to any host and run `node start.mjs`.
 
@@ -69,6 +69,12 @@ block in that file if the Pi is ever reachable on the LAN/Tailscale again.
 Set the sACN target with `SACN_HOST` / `SACN_PORT` in the unit (or a drop-in), or
 change it live from the control UI. The UI is reachable from any device on the LAN
 at `http://<host>:3002/`.
+
+### Output protocol: sACN vs DDP
+
+DDP is the default transport (port 4048): a Falcon controller in flat-addressing mode expects it, and it maps each E1.31 universe to a byte offset `(universe−1)×510` on the controller's contiguous channel buffer. `RUNNER_OUTPUT=sacn` switches to sACN/E1.31 (port 5568) to feed the relay/sim. Point the active transport with `RUNNER_OUTPUT_HOST` / `RUNNER_OUTPUT_PORT` (these fall back to `SACN_HOST` / `SACN_PORT`, then the protocol default port).
+
+Each protocol keeps its own persisted destination (`ddpHost`/`ddpPort` vs `sacnHost`/`sacnPort` in `settings.json`), so editing the host/port from the UI under one protocol never disturbs the other's saved value.
 
 The sACN destination and the live knobs (effect, running, speed, bpm) persist to
 `.runner-state/settings.json` (or in `/var/lib/gothic-folly-runner/`) and are restored on restart.
