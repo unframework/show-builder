@@ -132,7 +132,9 @@ async function main(): Promise<void> {
     focus,
     toRgbBytes(expander ? expander.wrap(output.emit) : output.emit),
   );
-  applyEffectSettings(source, saved);
+  // Boot stopped regardless of the persisted flag: a human taps start in the UI
+  // before the runner drives real hardware.
+  applyEffectSettings(source, { ...saved, running: false });
 
   const persist = (): void => {
     const { host, port } = output.destination;
