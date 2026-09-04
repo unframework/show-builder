@@ -16,7 +16,7 @@ export const SLOT_COUNT = 8;
 // and cheap, so writes need no debounce or flush.
 const KEY = 'gothicFolly.presets';
 
-const presetBank = z.array(preset.nullable());
+export const presetBank = z.array(preset.nullable());
 
 function empty(): (Preset | null)[] {
   return Array.from({ length: SLOT_COUNT }, () => null);
@@ -24,7 +24,7 @@ function empty(): (Preset | null)[] {
 
 // Pad/truncate a parsed bank to exactly SLOT_COUNT slots, so a changed SLOT_COUNT
 // or a hand-edited store can never desync the UI.
-function normalize(slots: (Preset | null)[]): (Preset | null)[] {
+export function normalize(slots: (Preset | null)[]): (Preset | null)[] {
   const out = empty();
   for (let i = 0; i < SLOT_COUNT; i++) out[i] = slots[i] ?? null;
   return out;
