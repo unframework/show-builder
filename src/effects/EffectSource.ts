@@ -196,7 +196,10 @@ export class EffectSource {
         const tl = target[layer];
         if (!tl) continue;
         for (const [key, value] of Object.entries(st.knobs)) {
-          if (tl.knobs[key]) tl.knobs[key] = { ...value };
+          const current = tl.knobs[key];
+          // Drop values whose shape no longer matches the knob's type (a knob that
+          // switched between scalar and beatRatio across versions); keep the default.
+          if (current && 'num' in current === 'num' in value) tl.knobs[key] = { ...value };
         }
         if (st.ramp) tl.ramp = st.ramp;
       }

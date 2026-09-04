@@ -539,10 +539,18 @@ const SWEEP_KNOBS: KnobSchema = {
     default: { base: 1, kick: 0 },
   },
 };
-// The vertical wave reuses scroll + density and adds shape control: `midpoint`
-// skews where the trough sits between crests, `sharpness` tightens the crest.
+// The vertical wave locks new-crest generation to tempo: `rate` is a beat ratio
+// (num/den waves born per beat; sign flips travel direction, num 0 freezes),
+// `density` sets crest spacing, `midpoint` skews where the trough sits between
+// crests, `sharpness` tightens the crest.
 const WAVEY_KNOBS: KnobSchema = {
-  scroll: SWEEP_KNOBS.scroll,
+  scroll: {
+    label: 'wave rate',
+    type: 'beatRatio',
+    num: { min: -8, max: 8, step: 1 },
+    den: { min: 1, max: 16, step: 1 },
+    default: { num: 1, den: 2 },
+  },
   freq: SWEEP_KNOBS.freq,
   midpoint: {
     label: 'midpoint',
@@ -777,8 +785,9 @@ const riseKind = defineKind<EffectRuntime>({
 });
 
 // A crest climbing yn that accelerates as it rises: sqrt-warping the height
-// compresses crest spacing toward the crown, so a steady scroll reads as speeding
-// up. Scroll sign flips direction; midpoint and sharpness shape the crest.
+// compresses crest spacing toward the crown, so a steadily generated wave reads as
+// speeding up. New waves are born at the tempo-locked `scroll` phase (num/den per
+// beat); midpoint and sharpness shape the crest.
 const waveYKind = defineKind<EffectRuntime>({
   schema: WAVEY_KNOBS,
   makePaint:
