@@ -34,7 +34,7 @@ export function snapshotSignature(s: ControlSnapshot): string {
               layer,
               Object.keys(st.knobs)
                 .sort()
-                .map((k) => [k, st.knobs[k].base, st.knobs[k].kick]),
+                .map((k) => [k, Object.entries(st.knobs[k]).sort()]),
               st.ramp ?? null,
             ];
           }),
@@ -64,12 +64,12 @@ export function restoreSnapshot(
       const t = target[layer];
       const c = current[layer];
       for (const key of Object.keys(t.knobs)) {
-        const tv = t.knobs[key];
-        const cv = c?.knobs[key];
-        if (!cv || cv.base !== tv.base)
-          ops.push(control.setParam(effect, layer, key, 'base', tv.base));
-        if (!cv || cv.kick !== tv.kick)
-          ops.push(control.setParam(effect, layer, key, 'kick', tv.kick));
+        const tv = t.knobs[key] as Record<'base' | 'kick' | 'num' | 'den', number>;
+        const cv = c?.knobs[key] as Record<'base' | 'kick' | 'num' | 'den', number> | undefined;
+        for (const field of Object.keys(tv) as Array<'base' | 'kick' | 'num' | 'den'>) {
+          if (!cv || cv[field] !== tv[field])
+            ops.push(control.setParam(effect, layer, key, field, tv[field]));
+        }
       }
       if (t.ramp && JSON.stringify(t.ramp) !== JSON.stringify(c?.ramp)) {
         ops.push(control.setRamp(effect, layer, t.ramp));

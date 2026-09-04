@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import type { EffectParams, LayerMeta } from '../effects/controlMessages';
 import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
-import { kickCurve, type Range } from '../effects/knobs';
+import { kickCurve, type BeatRatioValue, type Range } from '../effects/knobs';
 import { PALETTES, rampsEqual } from '../effects/palettes';
 import type { Ramp } from '../effects/stages';
 
@@ -359,28 +359,52 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                 <div key={key} className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
                     {def.label}
-                    {def.type === 'rate' && (
+                    {(def.type === 'rate' || def.type === 'beatRatio') && (
                       <span className="ml-1" title="clock rate">
                         🕐
                       </span>
                     )}
                   </span>
-                  <div className="flex items-center gap-1">
-                    <ScrubValue
-                      range={def.base}
-                      value={v.base}
-                      onChange={(x) => void source.setParam(effect, layer, key, 'base', x)}
-                      clock={def.type === 'rate' ? { kickAmt: v.kick, bpm } : undefined}
-                      size="sm"
-                    />
-                    <ScrubValue
-                      range={def.kick}
-                      value={v.kick}
-                      onChange={(x) => void source.setParam(effect, layer, key, 'kick', x)}
-                      size="sm"
-                      tag="k"
-                    />
-                  </div>
+                  {def.type === 'beatRatio' ? (
+                    <div className="flex items-center gap-1">
+                      <ScrubValue
+                        range={def.num}
+                        value={(v as BeatRatioValue).num}
+                        onChange={(x) => void source.setParam(effect, layer, key, 'num', x)}
+                        size="sm"
+                      />
+                      <span className="opacity-40">/</span>
+                      <ScrubValue
+                        range={def.den}
+                        value={(v as BeatRatioValue).den}
+                        onChange={(x) => void source.setParam(effect, layer, key, 'den', x)}
+                        size="sm"
+                        tag="d"
+                      />
+                      <span className="text-[0.6rem] opacity-40">cycles/beat</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <ScrubValue
+                        range={def.base}
+                        value={(v as { base: number }).base}
+                        onChange={(x) => void source.setParam(effect, layer, key, 'base', x)}
+                        clock={
+                          def.type === 'rate'
+                            ? { kickAmt: (v as { kick: number }).kick, bpm }
+                            : undefined
+                        }
+                        size="sm"
+                      />
+                      <ScrubValue
+                        range={def.kick}
+                        value={(v as { kick: number }).kick}
+                        onChange={(x) => void source.setParam(effect, layer, key, 'kick', x)}
+                        size="sm"
+                        tag="k"
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

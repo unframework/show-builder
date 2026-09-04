@@ -42,7 +42,7 @@ function cloneParams(params: EffectParams): EffectParams {
     const layerCopy: Record<string, LayerState> = {};
     for (const [layer, st] of Object.entries(layers)) {
       const knobs: KnobValues = {};
-      for (const [key, v] of Object.entries(st.knobs)) knobs[key] = { base: v.base, kick: v.kick };
+      for (const [key, v] of Object.entries(st.knobs)) knobs[key] = { ...v };
       layerCopy[layer] = st.ramp ? { knobs, ramp: st.ramp } : { knobs };
     }
     out[effect] = layerCopy;
@@ -105,7 +105,10 @@ export class EffectSource {
           ? { knobs: defaultKnobValues(knobs), ramp }
           : { knobs: defaultKnobValues(knobs) };
         const layerAcc: Record<string, number> = {};
-        for (const key in knobs) if (knobs[key].type === 'rate') layerAcc[key] = 0;
+        for (const key in knobs) {
+          const t = knobs[key].type;
+          if (t === 'rate' || t === 'beatRatio') layerAcc[key] = 0;
+        }
         if (Object.keys(layerAcc).length) acc[layer] = layerAcc;
       }
       this.params[id] = layers;
@@ -193,7 +196,7 @@ export class EffectSource {
         const tl = target[layer];
         if (!tl) continue;
         for (const [key, value] of Object.entries(st.knobs)) {
-          if (tl.knobs[key]) tl.knobs[key] = { base: value.base, kick: value.kick };
+          if (tl.knobs[key]) tl.knobs[key] = { ...value };
         }
         if (st.ramp) tl.ramp = st.ramp;
       }
@@ -249,10 +252,10 @@ export class EffectSource {
     effect: DemoEffectId,
     layer: string,
     key: string,
-    field: 'base' | 'kick',
+    field: 'base' | 'kick' | 'num' | 'den',
     value: number,
   ): void {
-    const knob = this.params[effect]?.[layer]?.knobs[key];
+    const knob = this.params[effect]?.[layer]?.knobs[key] as Record<string, number> | undefined;
     if (!knob || knob[field] === value) return;
 
     knob[field] = value;
@@ -282,7 +285,7 @@ export class EffectSource {
   // Resolve the active effect's knobs for this frame, per layer: base + beat-kick,
   // then integrate any rate knobs into their running phase (advanced by dt·speed)
   // and expose that phase in place of the rate. Each layer also carries its ramp.
-  private resolveActiveKnobs(dt: number): Record<string, LayerRuntime> {
+  private resolveActiveKnobs(dt: number, dBeat: number): Record<string, LayerRuntime> {
     const schema = EFFECT_KNOBS[this.effectId];
     const params = this.params[this.effectId];
     if (!schema || !params) return {};
@@ -295,8 +298,12 @@ export class EffectSource {
       const acc = phases?.[layer];
       if (acc) {
         for (const key in knobs) {
-          if (knobs[key].type === 'rate') {
+          const t = knobs[key].type;
+          if (t === 'rate') {
             acc[key] += resolved[key] * dt * this.speed;
+            resolved[key] = acc[key];
+          } else if (t === 'beatRatio') {
+            acc[key] += resolved[key] * dBeat;
             resolved[key] = acc[key];
           }
         }
@@ -311,7 +318,8 @@ export class EffectSource {
     const ease = this.beatNudge * Math.min(1, advance);
     this.beatNudge -= ease;
     const prevBeat = Math.floor(this.beat);
-    this.beat += advance + ease;
+    const dBeat = advance + ease;
+    this.beat += dBeat;
     const beat = Math.floor(this.beat);
 
     if (beat > prevBeat) this.notify({ type: 'beat', beat });
@@ -321,7 +329,7 @@ export class EffectSource {
     this.phase += dt * this.speed;
 
     const layers = this.layers;
-    const knobsByLayer = this.resolveActiveKnobs(dt);
+    const knobsByLayer = this.resolveActiveKnobs(dt, dBeat);
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const buf = this.buffers.get(p.universe)!;

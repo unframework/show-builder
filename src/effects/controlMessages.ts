@@ -5,7 +5,9 @@ export const demoEffectId = z.enum(
   DEMO_EFFECTS.map((e) => e.id) as [DemoEffectId, ...DemoEffectId[]],
 );
 
-export const knobValue = z.object({ base: z.number(), kick: z.number() });
+export const scalarKnobValue = z.object({ base: z.number(), kick: z.number() });
+export const beatRatioKnobValue = z.object({ num: z.number(), den: z.number() });
+export const knobValue = z.union([scalarKnobValue, beatRatioKnobValue]);
 export const rampPoint = z.object({ h: z.number(), s: z.number(), l: z.number() });
 
 // A layer instance's runtime state: its knob values and current ramp.
@@ -61,7 +63,7 @@ export const controlCommand = z.discriminatedUnion('type', [
     effect: demoEffectId,
     layer: z.string(),
     key: z.string(),
-    field: z.enum(['base', 'kick']),
+    field: z.enum(['base', 'kick', 'num', 'den']),
     value: z.number(),
   }),
   z.object({

@@ -10,12 +10,13 @@ export interface EffectControl {
   setSpeed(speed: number): Promise<void>;
   setBrightness(brightness: number): Promise<void>;
   setBpm(bpm: number): Promise<void>;
-  // Set a layer knob's base value or its beat-kick amount.
+  // Set one field of a layer knob's value: base/kick for scalar knobs, num/den for
+  // beatRatio knobs.
   setParam(
     effect: DemoEffectId,
     layer: string,
     key: string,
-    field: 'base' | 'kick',
+    field: 'base' | 'kick' | 'num' | 'den',
     value: number,
   ): Promise<void>;
   // Replace a layer's ramp (runtime state).

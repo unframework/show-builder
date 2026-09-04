@@ -60,13 +60,7 @@ const travelingBand = (coord: number, freq: number, offset: number) =>
 // A travelling crest peaking once per cycle. `mid` places the low point between
 // crests (0.5 = symmetric; away from it skews the rise/fall balance); `sharp` sets
 // how pointed the crest is — below 1 broad and soft, above 1 a narrow spike.
-const skewedCrest = (
-  coord: number,
-  freq: number,
-  offset: number,
-  mid: number,
-  sharp: number,
-) => {
+const skewedCrest = (coord: number, freq: number, offset: number, mid: number, sharp: number) => {
   const p = wrap(coord * freq - offset);
   const dist = p <= mid ? p / mid : (1 - p) / (1 - mid);
   return Math.pow(1 - dist, sharp);
@@ -132,7 +126,6 @@ const RING_SCALE_Y = 1;
 const RING_SCALE_Z = 0.05;
 // Searchlight: two opposite rays through the rose center, sweeping the facade
 // (X–Y) plane and blooming bright/white where they cross the rings.
-const SEARCH_SPEED = Math.PI; // axis rotation, radians per beat (π = one half-turn per beat)
 const SEARCH_WIDTH = 0.35; // angular half-width of each beam, radians
 const SEARCH_GAIN = 0.3; // lightness added at the beam core
 
@@ -649,15 +642,18 @@ const RING_RIPPLE_RAMP: Ramp = [
 ];
 
 // A two-armed beam rotating through the facade plane and blooming where it
-// crosses the rings: `speed` its spin (radians/beat), `width` its half-angle,
-// `gain` its brightness. Fixed downbeat phase offset keeps it clear of the crest.
+// crosses the rings: `spin` its beat-locked rate (num/den cycles per beat; the beam
+// is two-armed so one cycle is a 180° half-turn; num 0 freezes it), `width` its
+// half-angle, `gain` its brightness. Fixed downbeat phase offset keeps it clear of
+// the crest.
 const SEARCH_OFFSET = 0.55;
 const SEARCH_KNOBS: KnobSchema = {
-  speed: {
-    label: 'beam speed',
-    base: { min: 0, max: 2 * Math.PI, step: 0.05 },
-    kick: { min: -Math.PI, max: Math.PI, step: 0.05 },
-    default: { base: SEARCH_SPEED, kick: 0 },
+  spin: {
+    label: 'beam rate',
+    type: 'beatRatio',
+    num: { min: 0, max: 16, step: 1 },
+    den: { min: 1, max: 16, step: 1 },
+    default: { num: 1, den: 1 },
   },
   width: {
     label: 'beam width',
@@ -886,7 +882,8 @@ const searchlightKind = defineKind<EffectRuntime>({
     ({ index, beat, bpm }, k, ramp) => {
       const { angle } = rings[index];
       const kick = beatSpike(beat, bpm, PULSE_DECAY);
-      const beam = 1 - smoothstep(0, k.width, axisGap(angle - (beat - SEARCH_OFFSET) * k.speed));
+      const spin = k.spin * Math.PI;
+      const beam = 1 - smoothstep(0, k.width, axisGap(angle - (spin - SEARCH_OFFSET * Math.PI)));
       const [start, end] = ramp ?? SEARCH_RAMP;
       const [h, s, l] = ramp2(beam, start, end);
       return [h, s, l, (k.gain + 0.15 * kick) * beam];

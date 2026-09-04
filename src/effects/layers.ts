@@ -1,6 +1,6 @@
 import { hslToRgb } from './color';
 import type { EffectInput } from './demoEffects';
-import type { KnobSchema, KnobValue, KnobValues, ResolvedKnobs } from './knobs';
+import type { KnobSchema, KnobValues, ResolvedKnobs, ScalarKnobValue } from './knobs';
 import type { Ramp } from './stages';
 
 export type Hsla = [number, number, number, number];
@@ -33,7 +33,8 @@ export interface LayerKind<Ctx> {
 
 // Per-knob starting-value overrides for a kind reused across instances: each
 // instance can retune the shared schema's base/kick without its own kind.
-export type KnobDefaults = Record<string, Partial<KnobValue>>;
+// (Scalar knobs only; beatRatio knobs carry their fraction in the schema.)
+export type KnobDefaults = Record<string, Partial<ScalarKnobValue>>;
 
 // One named instance of a kind in an effect's static stack: its blend, a default
 // ramp seeding runtime state, and any per-instance knob-default overrides.
@@ -72,10 +73,12 @@ function withDefaults(schema: KnobSchema, defaults?: KnobDefaults): KnobSchema {
   if (!defaults) return schema;
   const out: KnobSchema = {};
   for (const key in schema) {
+    const def = schema[key];
     const override = defaults[key];
-    out[key] = override
-      ? { ...schema[key], default: { ...schema[key].default, ...override } }
-      : schema[key];
+    out[key] =
+      override && def.type !== 'beatRatio'
+        ? { ...def, default: { ...def.default, ...override } }
+        : def;
   }
   return out;
 }
