@@ -57,6 +57,20 @@ const wrap = (x: number) => ((x % 1) + 1) % 1;
 // unit, slid by `offset` (an integrated scroll phase plus any beat shove).
 const travelingBand = (coord: number, freq: number, offset: number) =>
   bell(wrap(coord * freq - offset));
+// A travelling crest peaking once per cycle. `mid` places the low point between
+// crests (0.5 = symmetric; away from it skews the rise/fall balance); `sharp` sets
+// how pointed the crest is — below 1 broad and soft, above 1 a narrow spike.
+const skewedCrest = (
+  coord: number,
+  freq: number,
+  offset: number,
+  mid: number,
+  sharp: number,
+) => {
+  const p = wrap(coord * freq - offset);
+  const dist = p <= mid ? p / mid : (1 - p) / (1 - mid);
+  return Math.pow(1 - dist, sharp);
+};
 // Angular gap (radians) to the nearest arm of a two-armed axis through the origin:
 // folded into [0, π/2] so a direction and its opposite read identically.
 const axisGap = (a: number) => {
@@ -99,11 +113,7 @@ const RAY_EXPAND = 0.2;
 // Horizontal detail multiplier at the floor, ramping to full (1) at the top:
 // compresses the sampled X-coord low down so the bottom reads coarser than the crown.
 const RAY_DETAIL_FLOOR = 0.05;
-// Rays palette + modulation: a slow hue oscillation, a height hue tint, and the
-// beat's lightness gain layered over the color ramp.
-const RAY_HUE_SPIN_RATE = 0.5;
-const RAY_HUE_SPIN = 0.2;
-const RAY_HEIGHT_HUE = -0.2;
+// Rays palette: the color ramp plus the beat's lightness gain screened on top.
 const RAY_KICK_LIGHT = 0.6;
 const RAY_RAMP_START: RampPoint = { h: -0.2, s: 1, l: 0 };
 const RAY_RAMP_END: RampPoint = { h: 0.05, s: 1, l: 0.5 };
@@ -349,6 +359,7 @@ export const DEMO_EFFECTS = [
   { id: 'noise-rays', label: 'noise rays' },
   { id: 'rings', label: 'rose rings' },
   { id: 'rising-bubbles', label: 'rising bubbles' },
+  { id: 'waveY', label: 'waveY' },
 ] as const;
 
 export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
@@ -422,18 +433,6 @@ const RAY_KNOBS: KnobSchema = {
     base: { min: 0.001, max: 0.5, step: 0.001 },
     kick: { min: -0.5, max: 0.5, step: 0.001 },
     default: { base: NOISE_EDGE, kick: 0 },
-  },
-  heightHue: {
-    label: 'height hue',
-    base: { min: -1, max: 1, step: 0.01 },
-    kick: { min: -1, max: 1, step: 0.01 },
-    default: { base: RAY_HEIGHT_HUE, kick: 0 },
-  },
-  hueSpin: {
-    label: 'hue spin',
-    base: { min: 0, max: 1, step: 0.01 },
-    kick: { min: -1, max: 1, step: 0.01 },
-    default: { base: RAY_HUE_SPIN, kick: 0 },
   },
 };
 
@@ -547,6 +546,24 @@ const SWEEP_KNOBS: KnobSchema = {
     default: { base: 1, kick: 0 },
   },
 };
+// The vertical wave reuses scroll + density and adds shape control: `midpoint`
+// skews where the trough sits between crests, `sharpness` tightens the crest.
+const WAVEY_KNOBS: KnobSchema = {
+  scroll: SWEEP_KNOBS.scroll,
+  freq: SWEEP_KNOBS.freq,
+  midpoint: {
+    label: 'midpoint',
+    base: { min: 0.05, max: 0.95, step: 0.01 },
+    kick: { min: -0.9, max: 0.9, step: 0.01 },
+    default: { base: 0.5, kick: 0 },
+  },
+  sharpness: {
+    label: 'sharpness',
+    base: { min: 0.2, max: 8, step: 0.05 },
+    kick: { min: -4, max: 4, step: 0.05 },
+    default: { base: 2, kick: 0 },
+  },
+};
 // Each sweep's two-point ramp runs a fixed hue dim → bright over the crest.
 const LR_SWEEP_RAMP: Ramp = [
   { h: 0.08, s: 0.95, l: 0.03 },
@@ -555,6 +572,10 @@ const LR_SWEEP_RAMP: Ramp = [
 const RISE_RAMP: Ramp = [
   { h: 0.7, s: 0.9, l: 0.03 },
   { h: 0.7, s: 0.9, l: 0.55 },
+];
+const WAVEY_RAMP: Ramp = [
+  { h: 0.09, s: 0.95, l: 0.03 },
+  { h: 0.09, s: 0.95, l: 0.55 },
 ];
 const FB_SWEEP_RAMP: Ramp = [
   { h: 0.5, s: 0.9, l: 0.03 },
@@ -759,6 +780,21 @@ const riseKind = defineKind<EffectRuntime>({
     },
 });
 
+// A crest climbing yn that accelerates as it rises: sqrt-warping the height
+// compresses crest spacing toward the crown, so a steady scroll reads as speeding
+// up. Scroll sign flips direction; midpoint and sharpness shape the crest.
+const waveYKind = defineKind<EffectRuntime>({
+  schema: WAVEY_KNOBS,
+  makePaint:
+    () =>
+    ({ yn }, k, ramp) => {
+      const [start, end] = ramp ?? WAVEY_RAMP;
+      const crest = skewedCrest(Math.sqrt(yn), k.freq, k.scroll, k.midpoint, k.sharpness);
+      const [h, s, l] = ramp2(crest, start, end);
+      return [h, s, l, 1];
+    },
+});
+
 const fbSweepKind = defineKind<EffectRuntime>({
   schema: SWEEP_KNOBS,
   makePaint:
@@ -806,7 +842,7 @@ const raysFieldKind = defineKind<EffectRuntime>({
   schema: RAY_KNOBS,
   makePaint: ({ noise4D, focus }) => {
     const [fx, fy, fz] = focus;
-    return ({ xn, yn, zn, phase }, k, ramp) => {
+    return ({ xn, yn, zn }, k, ramp) => {
       const dx = Math.abs(xn - fx);
       const dy = yn - fy;
       const dz = (zn - fz) * k.depth;
@@ -821,12 +857,7 @@ const raysFieldKind = defineKind<EffectRuntime>({
       const amt = threshold(v, { at: k.thresholdAt, edge: k.thresholdEdge });
       const [start, end] = ramp ?? [RAY_RAMP_START, RAY_RAMP_END];
       const [h, s, l] = ramp2(amt, start, end);
-      return [
-        h + k.hueSpin * Math.sin(phase * RAY_HUE_SPIN_RATE) + k.heightHue * verticalFade(yn),
-        s,
-        l,
-        1,
-      ];
+      return [h, s, l, 1];
     };
   },
 });
@@ -892,6 +923,7 @@ const NOISE_BLOBS: LayerSlot<EffectRuntime>[] = [
 
 const LR_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', lrSweepKind, LR_SWEEP_RAMP)];
 const RISE: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', riseKind, RISE_RAMP)];
+const WAVEY: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', waveYKind, WAVEY_RAMP)];
 const FB_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', fbSweepKind, FB_SWEEP_RAMP)];
 const RADIAL: LayerSlot<EffectRuntime>[] = [slot('pulse', 'over', radialKind, RADIAL_RAMP)];
 const TWINKLE: LayerSlot<EffectRuntime>[] = [slot('twinkle', 'over', twinkleKind, TWINKLE_RAMP)];
@@ -900,6 +932,7 @@ const TWINKLE: LayerSlot<EffectRuntime>[] = [slot('twinkle', 'over', twinkleKind
 // blooms rather than tints.
 const NOISE_RAYS: LayerSlot<EffectRuntime>[] = [
   slot('rays', 'over', raysFieldKind, [RAY_RAMP_START, RAY_RAMP_END]),
+  slot('height', 'multiply', heightRampKind, [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
   slot('bright', 'screen', pulseKind, [RAY_FLASH_RAMP_LOW, RAY_FLASH_RAMP_HIGH], {
     flash: { kick: RAY_KICK_LIGHT },
   }),
@@ -924,6 +957,7 @@ export const EFFECT_KNOBS: Partial<Record<DemoEffectId, Record<string, KnobSchem
   'noise-rays': topologySchemas(NOISE_RAYS),
   rings: topologySchemas(RINGS),
   'rising-bubbles': topologySchemas(RISING_BUBBLES),
+  waveY: topologySchemas(WAVEY),
 };
 
 // Seed ramps for layers that own their ramp as runtime state; other effects keep
@@ -938,6 +972,7 @@ export const EFFECT_RAMPS: Partial<Record<DemoEffectId, Record<string, Ramp>>> =
   'noise-rays': topologyRamps(NOISE_RAYS),
   rings: topologyRamps(RINGS),
   'rising-bubbles': topologyRamps(RISING_BUBBLES),
+  waveY: topologyRamps(WAVEY),
 };
 
 export function createDemoEffects(
@@ -959,5 +994,6 @@ export function createDemoEffects(
     'noise-rays': buildLayers(NOISE_RAYS, ctx),
     rings: buildLayers(RINGS, ctx),
     'rising-bubbles': buildLayers(RISING_BUBBLES, ctx),
+    waveY: buildLayers(WAVEY, ctx),
   };
 }
