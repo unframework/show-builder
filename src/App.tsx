@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BrightnessControl } from './components/BrightnessControl';
 import { EffectPanel } from './components/EffectPanel';
 import { HistoryControls } from './components/HistoryControls';
+import { PresetSlots } from './components/PresetSlots';
 import { RunToggle } from './components/RunToggle';
 import { Sidenav } from './components/Sidenav';
 import { Toolbar } from './components/Toolbar';
@@ -79,6 +80,7 @@ export function App() {
             Effects
           </h3>
           {engine && <HistoryControls source={effectSource} />}
+          {engine && <PresetSlots source={effectSource} />}
           {engine && <RunToggle source={effectSource} size="sm" />}
           {engine && <BrightnessControl source={effectSource} size="sm" />}
           {error ? (

@@ -4,6 +4,7 @@ import { BrightnessControl } from '../components/BrightnessControl';
 import { EffectControls } from '../components/EffectControls';
 import { EffectParamControls } from '../components/EffectParamControls';
 import { HistoryControls } from '../components/HistoryControls';
+import { PresetSlots } from '../components/PresetSlots';
 import { RunToggle } from '../components/RunToggle';
 import { OutputControls } from './OutputControls';
 import { createWsControl, type WsControl } from './wsControl';
@@ -31,6 +32,7 @@ export function RunnerApp() {
         <h1 className="text-sm font-semibold uppercase tracking-wide">The Gothic Folly</h1>
         <div className="flex flex-wrap items-center gap-4">
           {control && <HistoryControls source={control} />}
+          {control && <PresetSlots source={control} />}
           {control && <RunToggle source={control} size="sm" />}
           {control && <BrightnessControl source={control} size="sm" />}
           {control && <OutputControls source={control} />}

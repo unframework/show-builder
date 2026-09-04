@@ -32,6 +32,20 @@ body {
   animation: beat-flash 0.2s ease-out;
 }
 
+/* An armed preset slot pulses until it fires on the next beat. */
+@keyframes preset-armed {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-warning);
+  }
+  50% {
+    box-shadow: 0 0 0 3px var(--color-warning);
+  }
+}
+.preset-armed {
+  animation: preset-armed 0.6s ease-in-out infinite;
+}
+
 /* The engine injects its <canvas> into the wrap div at runtime, so size it here. */
 .canvas-wrap > canvas {
   display: block;

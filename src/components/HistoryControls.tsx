@@ -6,7 +6,7 @@ function UndoIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-3.5 w-3.5"
+      className="h-5 w-5"
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -23,7 +23,7 @@ function RedoIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-3.5 w-3.5"
+      className="h-5 w-5"
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -44,7 +44,7 @@ export function HistoryControls({ source }: { source: (EffectControl & OutputCap
         type="button"
         onClick={undo}
         disabled={!canUndo}
-        className="btn btn-ghost btn-xs btn-square join-item"
+        className="btn btn-ghost btn-sm btn-square join-item"
         title="Undo (Ctrl+Z)"
         aria-label="Undo"
       >
@@ -54,7 +54,7 @@ export function HistoryControls({ source }: { source: (EffectControl & OutputCap
         type="button"
         onClick={redo}
         disabled={!canRedo}
-        className="btn btn-ghost btn-xs btn-square join-item"
+        className="btn btn-ghost btn-sm btn-square join-item"
         title="Redo (Ctrl+Shift+Z)"
         aria-label="Redo"
       >
