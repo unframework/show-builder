@@ -119,4 +119,92 @@ export const PALETTES: NamedRamp[] = [
       { h: 0.5, s: 0.7, l: 0.55 },
     ],
   },
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    ramp: [
+      { h: -0.03, s: 0.95, l: 0.12 },
+      { h: 0.11, s: 1, l: 0.55 },
+    ],
+  },
+  {
+    id: 'molten',
+    name: 'Molten',
+    ramp: [
+      { h: 0, s: 1, l: 0.08 },
+      { h: 0.14, s: 1, l: 0.6 },
+    ],
+  },
+  {
+    id: 'meadow',
+    name: 'Meadow',
+    ramp: [
+      { h: 0.19, s: 0.85, l: 0.12 },
+      { h: 0.33, s: 0.8, l: 0.55 },
+    ],
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    ramp: [
+      { h: 0.42, s: 0.9, l: 0.12 },
+      { h: 0.52, s: 0.8, l: 0.6 },
+    ],
+  },
+  {
+    id: 'nebula',
+    name: 'Nebula',
+    ramp: [
+      { h: 0.62, s: 0.9, l: 0.12 },
+      { h: 0.85, s: 0.8, l: 0.55 },
+    ],
+  },
+  {
+    id: 'orchid',
+    name: 'Orchid',
+    ramp: [
+      { h: 0.78, s: 0.7, l: 0.2 },
+      { h: 0.92, s: 0.75, l: 0.6 },
+    ],
+  },
+  {
+    id: 'dusk',
+    name: 'Dusk',
+    ramp: [
+      { h: 0.72, s: 0.7, l: 0.15 },
+      { h: 1.05, s: 0.9, l: 0.55 },
+    ],
+  },
+  {
+    id: 'citrus',
+    name: 'Citrus',
+    ramp: [
+      { h: 0.15, s: 0.95, l: 0.55 },
+      { h: 0.02, s: 0.95, l: 0.55 },
+    ],
+  },
+  {
+    id: 'tropic',
+    name: 'Tropic',
+    ramp: [
+      { h: 0.35, s: 0.8, l: 0.52 },
+      { h: 0.5, s: 0.8, l: 0.52 },
+    ],
+  },
+  {
+    id: 'prism',
+    name: 'Prism',
+    ramp: [
+      { h: 0.5, s: 0.8, l: 0.55 },
+      { h: 0.85, s: 0.8, l: 0.55 },
+    ],
+  },
+  {
+    id: 'fuchsia',
+    name: 'Fuchsia',
+    ramp: [
+      { h: 0.92, s: 0.75, l: 0.58 },
+      { h: 0.75, s: 0.75, l: 0.58 },
+    ],
+  },
 ];
