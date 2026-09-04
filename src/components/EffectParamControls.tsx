@@ -165,7 +165,7 @@ function ScrubValue({
   const lastTap = useRef(0);
   const [drag, setDrag] = useState<DragState | null>(null);
   const decimals = decimalsFor(range.step);
-  const fmt = (v: number) => v.toFixed(decimals);
+  const fmt = (v: number) => (Number.isFinite(v) ? v : 0).toFixed(decimals);
 
   const snap = (v: number) => {
     const clamped = Math.min(range.max, Math.max(range.min, v));
@@ -354,7 +354,16 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
               </div>
             )}
             {Object.entries(knobs).map(([key, def]) => {
-              const v = values[key] ?? def.default;
+              const stored = values[key];
+              // Fall back to the default when the stored value's shape doesn't match
+              // the knob's current type — e.g. a knob that changed between scalar and
+              // beatRatio, or a UI newer than the engine it's driving. Guards render
+              // against feeding an undefined field into a scrubber.
+              const matches =
+                def.type === 'beatRatio'
+                  ? !!stored && 'num' in stored && 'den' in stored
+                  : !!stored && 'base' in stored && 'kick' in stored;
+              const v = matches ? stored! : def.default;
               return (
                 <div key={key} className="flex flex-col gap-1">
                   <span className="text-xs font-semibold uppercase tracking-wide opacity-60">
