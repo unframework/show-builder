@@ -578,6 +578,10 @@ const WAVEY_RAMP: Ramp = [
   { h: 0.09, s: 0.95, l: 0.03 },
   { h: 0.09, s: 0.95, l: 0.55 },
 ];
+const WAVEY_MONO_RAMP: Ramp = [
+  { h: 0, s: 0, l: 0.03 },
+  { h: 0, s: 0, l: 0.55 },
+];
 const FB_SWEEP_RAMP: Ramp = [
   { h: 0.5, s: 0.9, l: 0.03 },
   { h: 0.5, s: 0.9, l: 0.55 },
@@ -929,7 +933,10 @@ const NOISE_BLOBS: LayerSlot<EffectRuntime>[] = [
 
 const LR_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', lrSweepKind, LR_SWEEP_RAMP)];
 const RISE: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', riseKind, RISE_RAMP)];
-const WAVEY: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', waveYKind, WAVEY_RAMP)];
+const WAVEY: LayerSlot<EffectRuntime>[] = [
+  slot('sweep', 'over', waveYKind, WAVEY_RAMP),
+  slot('sweep2', 'add', waveYKind, WAVEY_MONO_RAMP),
+];
 const FB_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', fbSweepKind, FB_SWEEP_RAMP)];
 const RADIAL: LayerSlot<EffectRuntime>[] = [slot('pulse', 'over', radialKind, RADIAL_RAMP)];
 const TWINKLE: LayerSlot<EffectRuntime>[] = [slot('twinkle', 'over', twinkleKind, TWINKLE_RAMP)];
