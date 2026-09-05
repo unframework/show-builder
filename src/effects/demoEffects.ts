@@ -636,7 +636,7 @@ const SEARCH_KNOBS: KnobSchema = {
   spin: {
     label: 'beam rate',
     type: 'beatRatio',
-    num: { min: 0, max: 16, step: 1 },
+    num: { min: -16, max: 16, step: 1 },
     den: { min: 1, max: 16, step: 1 },
     default: { num: 1, den: 1 },
   },
