@@ -1,51 +1,30 @@
-import { z } from 'zod';
-import { demoEffectId, effectParams } from './effects/controlMessages';
+import { presetSlots } from './effects/controlMessages';
+import { emptySlots, normalizeFile, presetsFile, type PresetsFile } from './effects/presets';
 
-// A saved "look": the effect and its knob settings, nothing else. Speed, global
-// brightness, tempo/downbeat cue, and sACN output are live performance controls,
-// so recalling a preset changes only the effect selection and its knobs.
-export const preset = z.object({
-  effect: demoEffectId,
-  params: effectParams,
-});
-export type Preset = z.infer<typeof preset>;
-
-export const SLOT_COUNT = 8;
-
-// The sim's preset bank, kept in localStorage alongside effectStorage. Synchronous
-// and cheap, so writes need no debounce or flush.
+// The sim's analogue of the runner's presets.json, kept in localStorage. The sim
+// has no server, so the same one-slot-active model runs against local storage.
 const KEY = 'gothicFolly.presets';
 
-export const presetBank = z.array(preset.nullable());
-
-function empty(): (Preset | null)[] {
-  return Array.from({ length: SLOT_COUNT }, () => null);
-}
-
-// Pad/truncate a parsed bank to exactly SLOT_COUNT slots, so a changed SLOT_COUNT
-// or a hand-edited store can never desync the UI.
-export function normalize(slots: (Preset | null)[]): (Preset | null)[] {
-  const out = empty();
-  for (let i = 0; i < SLOT_COUNT; i++) out[i] = slots[i] ?? null;
-  return out;
-}
-
-export function loadPresets(): (Preset | null)[] {
+export function loadPresetsFile(): PresetsFile {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return empty();
-    const parsed = presetBank.safeParse(JSON.parse(raw));
-    if (parsed.success) return normalize(parsed.data);
+    if (!raw) return { slots: emptySlots(), active: null };
+    const value = JSON.parse(raw);
+    const parsed = presetsFile.safeParse(value);
+    if (parsed.success) return normalizeFile(parsed.data);
+    // A bare slot array is the pre-active-slot format.
+    const legacy = presetSlots.safeParse(value);
+    if (legacy.success) return normalizeFile({ slots: legacy.data, active: null });
     console.warn(`[sim] ignoring malformed ${KEY}: ${parsed.error.message}`);
   } catch (err) {
     console.warn(`[sim] could not read ${KEY}:`, err);
   }
-  return empty();
+  return { slots: emptySlots(), active: null };
 }
 
-export function savePresets(slots: (Preset | null)[]): void {
+export function savePresetsFile(file: PresetsFile): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(slots));
+    localStorage.setItem(KEY, JSON.stringify(file));
   } catch (err) {
     console.warn(`[sim] ${KEY} not persisted:`, err);
   }

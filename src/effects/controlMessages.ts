@@ -51,6 +51,17 @@ export const effectParams = z.preprocess(
 );
 export type EffectParams = z.infer<typeof effectParams>;
 
+// A saved "look": the effect and its knob settings, nothing else. Speed, global
+// brightness, and tempo/downbeat are live transport controls, so a preset never
+// carries them.
+export const preset = z.object({ effect: demoEffectId, params: effectParams });
+export type Preset = z.infer<typeof preset>;
+
+export const presetSlots = z.array(preset.nullable());
+export type Slots = z.infer<typeof presetSlots>;
+
+const slotIndex = z.number().int().nonnegative();
+
 // Browser control UI → runner.
 export const controlCommand = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set-effect'), id: demoEffectId }),
@@ -74,6 +85,9 @@ export const controlCommand = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('set-output'), host: z.string(), port: z.number().int().positive() }),
   z.object({ type: z.literal('cue-beat') }),
+  z.object({ type: z.literal('select-preset'), slot: slotIndex }),
+  z.object({ type: z.literal('clear-preset'), slot: slotIndex }),
+  z.object({ type: z.literal('set-presets'), slots: presetSlots }),
 ]);
 export type ControlCommand = z.infer<typeof controlCommand>;
 
@@ -131,5 +145,22 @@ export const controlOutput = z.object({
 });
 export type ControlOutput = z.infer<typeof controlOutput>;
 
-export const effectEvent = z.discriminatedUnion('type', [controlState, controlBeat, controlOutput]);
+// The preset slots and which one the live controls currently mirror, emitted on
+// connect and after every structural change (select/clear/import/beat-fire). An
+// `armed` slot is a select waiting for the next downbeat to land. Edits to the
+// active slot ride the state stream instead, so this doesn't fire per knob move.
+export const presetsEvent = z.object({
+  type: z.literal('presets'),
+  slots: presetSlots,
+  active: slotIndex.nullable(),
+  armed: slotIndex.nullable(),
+});
+export type PresetsEvent = z.infer<typeof presetsEvent>;
+
+export const effectEvent = z.discriminatedUnion('type', [
+  controlState,
+  controlBeat,
+  controlOutput,
+  presetsEvent,
+]);
 export type EffectEvent = z.infer<typeof effectEvent>;

@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from 'react';
 import clsx from 'clsx';
-import type { EffectControl } from '../effects/effectControl';
-import type { OutputCapable } from '../controlHistory';
+import type { PresetSource } from '../effects/effectControl';
 import { usePresets } from '../usePresets';
 
-type Source = (EffectControl & OutputCapable) | null;
+type Source = PresetSource | null;
 
 function ExportIcon() {
   return (
@@ -42,11 +41,11 @@ function ImportIcon() {
   );
 }
 
-// Numbered slot strip for saving and recalling looks (effect + knobs). Click a
-// filled slot to arm it — it snaps on the next beat. Modifiers cover save/clear/
-// immediate so no extra editor UI is needed.
+// Numbered slot strip. One slot is active and mirrors the live controls: click to
+// bind (a filled slot lands on the next beat, an empty one adopts the current
+// look), then editing rewrites it in place. Alt-click clears a slot.
 export function PresetSlots({ source }: { source: Source }) {
-  const { slots, activeIndex, armedIndex, load, loadNow, save, clear, exportBank, importBank } =
+  const { slots, activeIndex, armedIndex, select, clear, exportBank, importBank } =
     usePresets(source);
   const fileInput = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -61,15 +60,11 @@ export function PresetSlots({ source }: { source: Source }) {
 
   const onClick = (i: number, e: MouseEvent) => {
     setImportError(null);
-    if (e.altKey && e.shiftKey)
-      loadNow(i); // immediate, no beat alignment
-    else if (e.altKey) clear(i);
-    else if (e.shiftKey || !slots[i])
-      save(i); // save on Shift, or into an empty slot
-    else load(i); // arm to fire next beat
+    if (e.altKey) clear(i);
+    else select(i);
   };
 
-  // Number keys 1..N arm the matching slot, unless the user is typing.
+  // Number keys 1..N select the matching slot, unless the user is typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
@@ -79,12 +74,12 @@ export function PresetSlots({ source }: { source: Source }) {
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= slots.length) {
         e.preventDefault();
-        load(n - 1);
+        select(n - 1);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [load, slots.length]);
+  }, [select, slots.length]);
 
   return (
     <div className="flex items-center gap-2">
@@ -107,8 +102,8 @@ export function PresetSlots({ source }: { source: Source }) {
               )}
               title={
                 filled
-                  ? `Preset ${i + 1} — click: load on next beat · Shift: overwrite · Alt: clear · Alt+Shift: load now`
-                  : `Preset ${i + 1} (empty) — click to save the current look`
+                  ? `Preset ${i + 1} — click: bind (loads on next beat) · Alt: clear`
+                  : `Preset ${i + 1} (empty) — click to bind the current look`
               }
               aria-label={`Preset ${i + 1}${filled ? '' : ' (empty)'}${active ? ', active' : ''}${
                 armed ? ', armed' : ''

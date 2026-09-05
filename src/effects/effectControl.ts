@@ -1,4 +1,4 @@
-import type { EffectEvent } from './controlMessages';
+import type { EffectEvent, Slots } from './controlMessages';
 import type { DemoEffectId } from './demoEffects';
 import type { Ramp } from './stages';
 
@@ -28,3 +28,14 @@ export interface EffectControl {
   // Observe engine events (state, beats). Returns an unsubscribe.
   subscribe?(listener: (event: EffectEvent) => void): () => void;
 }
+
+// Preset slots as a control surface: one slot is active at a time and mirrors the
+// live controls, so there's no save — selecting binds, editing rewrites in place.
+// Both adapters replay the current `presets` event to each new subscriber.
+export interface PresetControl {
+  selectPreset(slot: number): void | Promise<void>;
+  clearPreset(slot: number): void | Promise<void>;
+  setPresets(slots: Slots): void | Promise<void>;
+}
+
+export type PresetSource = EffectControl & PresetControl;

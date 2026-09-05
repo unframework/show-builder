@@ -3,8 +3,9 @@ import type { EffectEvent } from './effects/controlMessages';
 import type { CathedralEngine } from './engine/CathedralEngine';
 import { applyEffectSettings, EffectSource, type ResumeState } from './effects/EffectSource';
 import { toRgbBytes } from './effects/frameOutput';
-import type { EffectControl } from './effects/effectControl';
+import type { EffectControl, PresetControl } from './effects/effectControl';
 import { loadEffectSettings, saveEffectSettings } from './effectStorage';
+import { loadPresetsFile, savePresetsFile } from './presetStorage';
 
 // Rebound when the engine module hot-swaps so `new ActiveEffectSource()` picks
 // up the new code (the static import binding is not rebound by hot.accept).
@@ -21,7 +22,10 @@ if (import.meta.hot) {
 
 // Drives the procedural EffectSource, which feeds the engine whenever the relay
 // is idle. Live frames win: the rAF loop runs only while `isLive` is false.
-export function useEffectSource(engine: CathedralEngine | null, isLive: boolean): EffectControl {
+export function useEffectSource(
+  engine: CathedralEngine | null,
+  isLive: boolean,
+): EffectControl & PresetControl {
   const sourceRef = useRef<EffectSource | null>(null);
   const listenersRef = useRef(new Set<(event: EffectEvent) => void>());
   const resumeRef = useRef<ResumeState | null>(null);
@@ -47,12 +51,15 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
     );
     const unsubscribe = source.subscribe((event) => {
       if (event.type === 'state') saveEffectSettings(event);
+      else if (event.type === 'presets')
+        savePresetsFile({ slots: event.slots, active: event.active });
       for (const listener of listenersRef.current) listener(event);
     });
     sourceRef.current = source;
     // A hot-reload resume already carries the live knobs (plus the animation
     // clock); only a cold mount needs to replay the persisted ones.
     if (!resume) applyEffectSettings(source, loadEffectSettings());
+    source.hydratePresets(loadPresetsFile());
     return () => {
       if (import.meta.hot) resumeRef.current = source.getResumeState();
       unsubscribe();
@@ -75,7 +82,7 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
 
   // Stable identity across renders: methods read the live source via refs, so a
   // single adapter survives engine rebuilds and lets consumers key effects on it.
-  return useMemo<EffectControl>(
+  return useMemo<EffectControl & PresetControl>(
     () => ({
       setEffect: async (id) => {
         sourceRef.current?.setEffect(id);
@@ -101,8 +108,19 @@ export function useEffectSource(engine: CathedralEngine | null, isLive: boolean)
       cueBeat: async () => {
         sourceRef.current?.cueBeat();
       },
+      selectPreset: (slot) => {
+        sourceRef.current?.selectPreset(slot);
+      },
+      clearPreset: (slot) => {
+        sourceRef.current?.clearPreset(slot);
+      },
+      setPresets: (slots) => {
+        sourceRef.current?.setPresets(slots);
+      },
       subscribe: (listener) => {
         listenersRef.current.add(listener);
+        const source = sourceRef.current;
+        if (source) listener(source.getPresetsEvent());
         return () => listenersRef.current.delete(listener);
       },
     }),

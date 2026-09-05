@@ -7,7 +7,12 @@ import {
   type EffectParams,
   type EffectResumeState,
   type EffectSettings,
+  type Preset,
+  type PresetsEvent,
+  type Slots,
 } from './controlMessages';
+import { snapshotSignature } from '../controlHistory';
+import { emptySlots, normalizeSlots, type PresetsFile } from './presets';
 import {
   createDemoEffectContext,
   createDemoEffects,
@@ -86,6 +91,10 @@ export class EffectSource {
   private beatNudge = 0;
   private readonly params: EffectParams = {};
   private readonly phases: Record<string, Record<string, Record<string, number>>> = {};
+
+  private slots: Slots = emptySlots();
+  private active: number | null = null;
+  private armed: number | null = null;
 
   constructor(pixels: PixelDescriptor[], focus: Vec3, emit: FrameSink, resume?: ResumeState) {
     this.pixels = pixels;
@@ -216,6 +225,7 @@ export class EffectSource {
     this.effectId = id;
     this.layers = this.layersById[id];
     this.notify(this.getState());
+    this.commitActive();
   }
 
   setRunning(running: boolean): void {
@@ -249,6 +259,7 @@ export class EffectSource {
   setParams(params: EffectParams): void {
     this.mergeParams(params);
     this.notify(this.getState());
+    this.commitActive();
   }
 
   setParam(
@@ -263,6 +274,7 @@ export class EffectSource {
 
     knob[field] = value;
     this.notify(this.getState());
+    this.commitActive();
   }
 
   setRamp(effect: DemoEffectId, layer: string, ramp: Ramp): void {
@@ -271,6 +283,7 @@ export class EffectSource {
 
     state.ramp = ramp;
     this.notify(this.getState());
+    this.commitActive();
   }
 
   cueBeat(): void {
@@ -283,6 +296,114 @@ export class EffectSource {
       this.beat = 0;
       this.beatNudge = 0;
     }
+  }
+
+  getPresets(): PresetsFile {
+    return { slots: this.cloneSlots(), active: this.active };
+  }
+
+  getPresetsEvent(): PresetsEvent {
+    return { type: 'presets', slots: this.cloneSlots(), active: this.active, armed: this.armed };
+  }
+
+  // Seed slots from storage. The active slot mirrors the live look — already
+  // restored from settings — so trust that over whatever stale copy the store held.
+  hydratePresets(file: PresetsFile): void {
+    this.slots = normalizeSlots(file.slots);
+    this.armed = null;
+    this.active = file.active !== null && this.slots[file.active] ? file.active : null;
+    if (this.active !== null) this.slots[this.active] = this.captureLook();
+  }
+
+  selectPreset(slot: number): void {
+    if (slot < 0 || slot >= this.slots.length) return;
+    const target = this.slots[slot];
+    if (!target) {
+      this.slots[slot] = this.captureLook();
+      this.active = slot;
+      this.armed = null;
+      this.emitPresets();
+      return;
+    }
+    if (this.active === slot && this.armed === null) return;
+    if (this.lookSig(target) === this.lookSig(this.captureLook())) {
+      this.active = slot;
+      this.armed = null;
+      this.emitPresets();
+      return;
+    }
+    this.armed = slot;
+    this.emitPresets();
+  }
+
+  clearPreset(slot: number): void {
+    if (slot < 0 || slot >= this.slots.length) return;
+    if (!this.slots[slot] && this.active !== slot && this.armed !== slot) return;
+    this.slots[slot] = null;
+    if (this.active === slot) this.active = null;
+    if (this.armed === slot) this.armed = null;
+    this.emitPresets();
+  }
+
+  setPresets(slots: Slots): void {
+    this.slots = normalizeSlots(slots);
+    this.active = null;
+    this.armed = null;
+    this.emitPresets();
+  }
+
+  private captureLook(): Preset {
+    return { effect: this.effectId, params: cloneParams(this.params) };
+  }
+
+  private lookSig(p: Preset): string {
+    return snapshotSignature({
+      effect: p.effect,
+      params: p.params,
+      speed: 0,
+      brightness: 0,
+      bpm: 0,
+    });
+  }
+
+  private cloneSlots(): Slots {
+    return this.slots.map((s) => (s ? { effect: s.effect, params: cloneParams(s.params) } : null));
+  }
+
+  private emitPresets(): void {
+    this.notify(this.getPresetsEvent());
+  }
+
+  // Fold the live look into the active slot on every edit; the slot is a mirror,
+  // not a saved copy, so there's no save gesture.
+  private commitActive(): void {
+    if (this.active === null) return;
+    this.slots[this.active] = this.captureLook();
+  }
+
+  private applyLook(p: Preset): void {
+    if (p.effect !== this.effectId) {
+      this.effectId = p.effect;
+      this.layers = this.layersById[p.effect];
+    }
+    this.mergeParams(p.params);
+  }
+
+  // A select that changed the look waits here for the downbeat, so live switches
+  // land on the beat.
+  private fireArmed(): void {
+    const slot = this.armed;
+    if (slot === null) return;
+    this.armed = null;
+    const p = this.slots[slot];
+    if (!p) {
+      this.emitPresets();
+      return;
+    }
+    this.applyLook(p);
+    this.active = slot;
+    this.notify(this.getState());
+    this.emitPresets();
   }
 
   // Resolve the active effect's knobs for this frame, per layer: base + beat-kick,
@@ -325,7 +446,10 @@ export class EffectSource {
     this.beat += dBeat;
     const beat = Math.floor(this.beat);
 
-    if (beat > prevBeat) this.notify({ type: 'beat', beat });
+    if (beat > prevBeat) {
+      this.fireArmed();
+      this.notify({ type: 'beat', beat });
+    }
 
     if (!this.running) return;
 

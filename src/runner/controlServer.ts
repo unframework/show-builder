@@ -23,6 +23,7 @@ export interface ControlServerOptions {
   source: EffectSource;
   output: PixelOutput;
   onPersist: () => void;
+  onPersistPresets: () => void;
 }
 
 // Serves the built control UI over HTTP and relays its commands to the running
@@ -34,8 +35,10 @@ export function startControlServer({
   source,
   output,
   onPersist,
+  onPersistPresets,
 }: ControlServerOptions): void {
   let latestState = source.getState();
+  let latestPresets = source.getPresetsEvent();
   const outputEvent = (): ControlOutput => {
     const { host: sacnHost, port: sacnPort } = output.destination;
     return { type: 'output', sacnHost, sacnPort };
@@ -59,6 +62,9 @@ export function startControlServer({
     if (event.type === 'state') {
       latestState = event;
       onPersist();
+    } else if (event.type === 'presets') {
+      latestPresets = event;
+      onPersistPresets();
     }
     broadcast(event);
   });
@@ -66,6 +72,7 @@ export function startControlServer({
   wss.on('connection', (ws) => {
     ws.send(JSON.stringify(latestState));
     ws.send(JSON.stringify(outputEvent()));
+    ws.send(JSON.stringify(latestPresets));
     ws.on('message', (data) => {
       const parsed = controlCommand.safeParse(JSON.parse(data.toString()));
       if (!parsed.success) return;
@@ -99,6 +106,15 @@ export function startControlServer({
           break;
         case 'cue-beat':
           source.cueBeat();
+          break;
+        case 'select-preset':
+          source.selectPreset(cmd.slot);
+          break;
+        case 'clear-preset':
+          source.clearPreset(cmd.slot);
+          break;
+        case 'set-presets':
+          source.setPresets(cmd.slots);
           break;
       }
     });

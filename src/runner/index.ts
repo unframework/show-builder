@@ -16,6 +16,7 @@ import { ZONE_DEFS, type ZoneId } from '../scene/zones';
 import { startControlServer } from './controlServer';
 import { loadPetalExpander } from './petalExpand';
 import { createSettingsSaver, loadSettings, resolveStateDir } from './settingsStore';
+import { createPresetsSaver, loadPresets } from './presetsStore';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PIXEL_MAP_DIR = process.env.PIXEL_MAP_DIR ?? join(REPO_ROOT, 'pixel-map');
@@ -119,6 +120,8 @@ async function main(): Promise<void> {
   const stateDir = resolveStateDir();
   const saved = await loadSettings(stateDir);
   const saver = createSettingsSaver(stateDir);
+  const savedPresets = await loadPresets(stateDir);
+  const presetsSaver = createPresetsSaver(stateDir);
 
   const startHost = saved[HOST_KEY] ?? ENV_OUTPUT_HOST ?? '127.0.0.1';
   const startPort = saved[PORT_KEY] ?? Number(ENV_OUTPUT_PORT ?? DEFAULT_PORT);
@@ -135,6 +138,7 @@ async function main(): Promise<void> {
   // Boot stopped regardless of the persisted flag: a human taps start in the UI
   // before the runner drives real hardware.
   applyEffectSettings(source, { ...saved, running: false });
+  source.hydratePresets(savedPresets);
 
   const persist = (): void => {
     const { host, port } = output.destination;
@@ -151,9 +155,10 @@ async function main(): Promise<void> {
       params,
     });
   };
+  const persistPresets = (): void => presetsSaver.save(source.getPresets());
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {
-      void saver.flush().finally(() => process.exit(0));
+      void Promise.allSettled([saver.flush(), presetsSaver.flush()]).finally(() => process.exit(0));
     });
   }
 
@@ -171,6 +176,7 @@ async function main(): Promise<void> {
     source,
     output,
     onPersist: persist,
+    onPersistPresets: persistPresets,
   });
   const { host: outHost, port: outPort } = output.destination;
   const rose = expander ? ' + rose petal expansion (u76–u139)' : '';

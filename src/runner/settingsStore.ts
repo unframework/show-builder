@@ -17,10 +17,12 @@ export const runnerSettings = effectSettings.extend({
 });
 export type RunnerSettings = z.infer<typeof runnerSettings>;
 
-export interface SettingsSaver {
-  save(settings: RunnerSettings): void;
+export interface JsonSaver<T> {
+  save(value: T): void;
   flush(): Promise<void>;
 }
+
+export type SettingsSaver = JsonSaver<RunnerSettings>;
 
 // systemd's StateDirectory= grants a persistent writable dir even under
 // DynamicUser; RUNNER_STATE_DIR overrides it; otherwise a dev-only repo-local dir.
@@ -48,38 +50,42 @@ export async function loadSettings(dir: string): Promise<RunnerSettings> {
 
 // Persistence is best-effort: a read-only target logs once and the show plays on.
 // Writes throttle to at most one per window and land atomically via a temp rename.
-export function createSettingsSaver(dir: string): SettingsSaver {
-  const path = join(dir, FILE);
+export function createJsonSaver<T>(dir: string, file: string): JsonSaver<T> {
+  const path = join(dir, file);
   const tmp = `${path}.tmp`;
-  let pending: RunnerSettings | null = null;
+  let pending: { value: T } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let warned = false;
 
   const flush = async (): Promise<void> => {
-    const settings = pending;
+    const held = pending;
     pending = null;
     if (timer) {
       clearTimeout(timer);
       timer = null;
     }
-    if (!settings) return;
+    if (!held) return;
     try {
       await mkdir(dir, { recursive: true });
-      await writeFile(tmp, JSON.stringify(settings, null, 2) + '\n');
+      await writeFile(tmp, JSON.stringify(held.value, null, 2) + '\n');
       await rename(tmp, path);
     } catch (err) {
       if (!warned) {
         warned = true;
-        console.warn(`[runner] settings not persisted (${dir} not writable?):`, err);
+        console.warn(`[runner] ${file} not persisted (${dir} not writable?):`, err);
       }
     }
   };
 
   return {
-    save(settings) {
-      pending = settings;
+    save(value) {
+      pending = { value };
       timer ??= setTimeout(() => void flush(), SAVE_DEBOUNCE_MS);
     },
     flush,
   };
+}
+
+export function createSettingsSaver(dir: string): SettingsSaver {
+  return createJsonSaver<RunnerSettings>(dir, FILE);
 }
