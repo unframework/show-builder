@@ -93,11 +93,11 @@ export function useControlHistory(control: Control | null): ControlHistory {
     const unsubscribe = control.subscribe((event) => {
       if (event.type === 'state') {
         h.latestState = {
-          effect: event.effect,
+          layers: event.layers,
           speed: event.speed,
           brightness: event.brightness,
           bpm: event.bpm,
-          params: event.params ?? {},
+          params: event.params,
         };
       } else if (event.type === 'output') {
         h.latestOutput = { host: event.sacnHost, port: event.sacnPort };

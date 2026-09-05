@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { DEMO_EFFECTS, type DemoEffectId } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
 import { useEditable } from './useEditable';
 import { useTapTempo } from './useTapTempo';
 
 export function EffectControls({ source }: { source: EffectControl }) {
-  const [effect, setEffect] = useState<DemoEffectId>('zone');
   const [speed, setSpeed] = useState(1);
   const [bpm, setBpm] = useState(120);
   const [pulse, setPulse] = useState(0);
@@ -45,7 +43,6 @@ export function EffectControls({ source }: { source: EffectControl }) {
           return;
         }
         if (event.type !== 'state') return;
-        setEffect(event.effect);
         setSpeed(event.speed);
         setBpm(event.bpm);
       }),
@@ -54,25 +51,6 @@ export function EffectControls({ source }: { source: EffectControl }) {
 
   return (
     <>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-semibold uppercase tracking-wide opacity-60">EFFECT</span>
-        <select
-          className="select select-sm select-bordered w-full"
-          value={effect}
-          onChange={(e) => {
-            const id = e.target.value as DemoEffectId;
-            setEffect(id);
-            void source.setEffect(id);
-          }}
-        >
-          {DEMO_EFFECTS.map((eff) => (
-            <option key={eff.id} value={eff.id}>
-              {eff.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="flex flex-col gap-1">
         <span className="text-xs font-semibold uppercase tracking-wide opacity-60">SPEED</span>
         <div className="flex items-center gap-2">

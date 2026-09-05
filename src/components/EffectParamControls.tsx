@@ -1,15 +1,17 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent } from 'react';
 import clsx from 'clsx';
-import type { EffectParams, LayerMeta } from '../effects/controlMessages';
-import { EFFECT_KNOBS, type DemoEffectId } from '../effects/demoEffects';
+import type { LayerDef, LayerParams } from '../effects/controlMessages';
+import { LAYER_KINDS } from '../effects/demoEffects';
 import type { EffectControl } from '../effects/effectControl';
 import { kickCurve, type BeatRatioValue, type Range } from '../effects/knobs';
+import { withDefaults } from '../effects/layers';
 import { PALETTES, rampsEqual } from '../effects/palettes';
 import type { Ramp } from '../effects/stages';
+import { LayerStackEditor } from './LayerStackEditor';
 
 // A layer's palette as a CSS gradient swatch. HSL stops map straight to CSS
 // hsl() (0-1 → deg/%), an approximation of the sim's colour.
-const rampCss = (ramp: NonNullable<LayerMeta['ramp']>) => {
+const rampCss = (ramp: Ramp) => {
   const stops = ramp.map((p, i) => {
     const pos = ramp.length === 1 ? 0 : (i / (ramp.length - 1)) * 100;
     return `hsl(${p.h * 360} ${p.s * 100}% ${p.l * 100}%) ${pos}%`;
@@ -17,13 +19,7 @@ const rampCss = (ramp: NonNullable<LayerMeta['ramp']>) => {
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 };
 
-function RampPicker({
-  ramp,
-  onPick,
-}: {
-  ramp: NonNullable<LayerMeta['ramp']>;
-  onPick: (ramp: Ramp) => void;
-}) {
+function RampPicker({ ramp, onPick }: { ramp: Ramp; onPick: (ramp: Ramp) => void }) {
   return (
     <details className="dropdown">
       <summary
@@ -306,39 +302,37 @@ function ScrubOverlay({ drag, fmt }: { drag: DragState; fmt: (v: number) => stri
   );
 }
 
-// Knob panel for the selected effect: each tunable exposes a scrub value for its
-// base plus one for its beat-kick amount. Mirrors the effect's persisted params
-// from the state stream and dispatches edits through the same control transport.
+// Knob panel for the live stack: each layer's tunables expose a scrub value for
+// their base plus one for their beat-kick amount, and a palette picker. The stack
+// itself is edited above via LayerStackEditor. Schema is derived from each layer's
+// kind in the registry; params mirror the state stream over the same transport.
 export function EffectParamControls({ source }: { source: EffectControl }) {
-  const [effect, setEffect] = useState<DemoEffectId>('zone');
-  const [params, setParams] = useState<EffectParams>({});
-  const [layers, setLayers] = useState<LayerMeta[]>([]);
+  const [layers, setLayers] = useState<LayerDef[]>([]);
+  const [params, setParams] = useState<LayerParams>({});
   const [bpm, setBpm] = useState(120);
 
   useEffect(
     () =>
       source.subscribe?.((event) => {
         if (event.type !== 'state') return;
-        setEffect(event.effect);
-        setParams(event.params ?? {});
-        setLayers(event.layers ?? []);
+        setLayers(event.layers);
+        setParams(event.params);
         setBpm(event.bpm);
       }),
     [source],
   );
 
-  const schema = EFFECT_KNOBS[effect];
-  if (!schema) return null;
-  const layerParams = params[effect] ?? {};
-
-  const groups = Object.entries(schema);
-  const showLayers = groups.length > 1;
+  const showLayers = layers.length > 1;
 
   return (
     <>
-      {groups.map(([layer, knobs]) => {
-        const values = layerParams[layer]?.knobs ?? {};
-        const ramp = layerParams[layer]?.ramp ?? layers.find((l) => l.name === layer)?.ramp;
+      <LayerStackEditor layers={layers} onChange={(next) => void source.setLayers(next)} />
+      {layers.map((ld) => {
+        const layer = ld.name;
+        const kind = LAYER_KINDS[ld.kind as keyof typeof LAYER_KINDS];
+        const knobs = kind ? withDefaults(kind.schema, ld.defaults) : {};
+        const values = params[layer]?.knobs ?? {};
+        const ramp = params[layer]?.ramp ?? ld.ramp;
         return (
           <Fragment key={layer}>
             {(showLayers || ramp) && (
@@ -349,7 +343,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                   </span>
                 )}
                 {ramp && ramp.length > 0 && (
-                  <RampPicker ramp={ramp} onPick={(r) => void source.setRamp(effect, layer, r)} />
+                  <RampPicker ramp={ramp} onPick={(r) => void source.setRamp(layer, r)} />
                 )}
               </div>
             )}
@@ -379,14 +373,14 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                       <ScrubValue
                         range={def.num}
                         value={(v as BeatRatioValue).num}
-                        onChange={(x) => void source.setParam(effect, layer, key, 'num', x)}
+                        onChange={(x) => void source.setParam(layer, key, 'num', x)}
                         size="sm"
                       />
                       <span className="opacity-40">/</span>
                       <ScrubValue
                         range={def.den}
                         value={(v as BeatRatioValue).den}
-                        onChange={(x) => void source.setParam(effect, layer, key, 'den', x)}
+                        onChange={(x) => void source.setParam(layer, key, 'den', x)}
                         size="sm"
                         tag="d"
                       />
@@ -397,7 +391,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                       <ScrubValue
                         range={def.base}
                         value={(v as { base: number }).base}
-                        onChange={(x) => void source.setParam(effect, layer, key, 'base', x)}
+                        onChange={(x) => void source.setParam(layer, key, 'base', x)}
                         clock={
                           def.type === 'rate'
                             ? { kickAmt: (v as { kick: number }).kick, bpm }
@@ -408,7 +402,7 @@ export function EffectParamControls({ source }: { source: EffectControl }) {
                       <ScrubValue
                         range={def.kick}
                         value={(v as { kick: number }).kick}
-                        onChange={(x) => void source.setParam(effect, layer, key, 'kick', x)}
+                        onChange={(x) => void source.setParam(layer, key, 'kick', x)}
                         size="sm"
                         tag="k"
                       />

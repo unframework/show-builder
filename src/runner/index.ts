@@ -142,16 +142,16 @@ async function main(): Promise<void> {
 
   const persist = (): void => {
     const { host, port } = output.destination;
-    const { effect, running, speed, brightness, bpm, params } = source.getState();
+    const { running, speed, brightness, bpm, layers, params } = source.getState();
     saver.save({
       ...saved,
       [HOST_KEY]: host,
       [PORT_KEY]: port,
-      effect,
       running,
       speed,
       brightness,
       bpm,
+      layers,
       params,
     });
   };

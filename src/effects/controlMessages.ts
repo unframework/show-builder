@@ -1,14 +1,11 @@
 import { z } from 'zod';
-import { DEMO_EFFECTS, type DemoEffectId } from './demoEffects';
-
-export const demoEffectId = z.enum(
-  DEMO_EFFECTS.map((e) => e.id) as [DemoEffectId, ...DemoEffectId[]],
-);
 
 export const scalarKnobValue = z.object({ base: z.number(), kick: z.number() });
 export const beatRatioKnobValue = z.object({ num: z.number(), den: z.number() });
 export const knobValue = z.union([scalarKnobValue, beatRatioKnobValue]);
 export const rampPoint = z.object({ h: z.number(), s: z.number(), l: z.number() });
+
+export const blendMode = z.enum(['over', 'add', 'screen', 'multiply']);
 
 // A layer instance's runtime state: its knob values and current ramp.
 export const layerState = z.object({
@@ -16,45 +13,28 @@ export const layerState = z.object({
   ramp: z.array(rampPoint).optional(),
 });
 
-// Lift persisted params from the old flat `effect → "layer.knob" → value` shape to
-// the nested `effect → layer → { knobs, ramp }` one. Detected by inner values that
-// are bare knob values; unscoped keys (no dot) are dropped.
-function migrateParams(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object') return raw;
-  const out: Record<string, unknown> = {};
-  for (const [effect, layers] of Object.entries(raw as Record<string, unknown>)) {
-    if (!layers || typeof layers !== 'object') {
-      out[effect] = layers;
-      continue;
-    }
-    const entries = Object.entries(layers as Record<string, unknown>);
-    const flat = entries.some(([, v]) => knobValue.safeParse(v).success);
-    if (!flat) {
-      out[effect] = layers;
-      continue;
-    }
-    const nested: Record<string, { knobs: Record<string, unknown> }> = {};
-    for (const [key, v] of entries) {
-      const dot = key.indexOf('.');
-      if (dot < 0) continue;
-      (nested[key.slice(0, dot)] ??= { knobs: {} }).knobs[key.slice(dot + 1)] = v;
-    }
-    out[effect] = nested;
-  }
-  return out;
-}
+// Per-instance starting-value overrides baked into a serialized layer def.
+export const knobDefaults = z.record(z.string(), scalarKnobValue.partial());
 
-// Per-effect knob values, keyed effect → layer → { knobs, ramp }.
-export const effectParams = z.preprocess(
-  migrateParams,
-  z.record(z.string(), z.record(z.string(), layerState)),
-);
-export type EffectParams = z.infer<typeof effectParams>;
+// A serializable layer instance: the kind referenced by registry id, its blend,
+// a seed ramp, and any per-instance knob-default overrides.
+export const layerDef = z.object({
+  name: z.string(),
+  kind: z.string(),
+  blend: blendMode,
+  ramp: z.array(rampPoint).optional(),
+  defaults: knobDefaults.optional(),
+});
+export type LayerDef = z.infer<typeof layerDef>;
 
-// A saved "look": the effect and its knob settings, nothing else. Speed, global
-// brightness, and tempo/downbeat are live transport controls, so a preset never
-// carries them.
-export const preset = z.object({ effect: demoEffectId, params: effectParams });
+// The live stack's per-layer knob/ramp state, keyed layer → { knobs, ramp }.
+export const layerParams = z.record(z.string(), layerState);
+export type LayerParams = z.infer<typeof layerParams>;
+
+// A saved "look": a layer stack plus its per-layer knob/ramp state, nothing else.
+// Speed, global brightness, and tempo/downbeat are live transport controls, so a
+// look never carries them.
+export const preset = z.object({ layers: z.array(layerDef), params: layerParams });
 export type Preset = z.infer<typeof preset>;
 
 export const presetSlots = z.array(preset.nullable());
@@ -64,25 +44,20 @@ const slotIndex = z.number().int().nonnegative();
 
 // Browser control UI → runner.
 export const controlCommand = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('set-effect'), id: demoEffectId }),
   z.object({ type: z.literal('set-speed'), speed: z.number() }),
   z.object({ type: z.literal('set-brightness'), brightness: z.number() }),
   z.object({ type: z.literal('set-bpm'), bpm: z.number() }),
   z.object({ type: z.literal('set-running'), running: z.boolean() }),
+  // Replace the whole live stack: covers reorder, blend, add, remove, swap-kind.
+  z.object({ type: z.literal('set-layers'), layers: z.array(layerDef) }),
   z.object({
     type: z.literal('set-param'),
-    effect: demoEffectId,
     layer: z.string(),
     key: z.string(),
     field: z.enum(['base', 'kick', 'num', 'den']),
     value: z.number(),
   }),
-  z.object({
-    type: z.literal('set-ramp'),
-    effect: demoEffectId,
-    layer: z.string(),
-    ramp: z.array(rampPoint),
-  }),
+  z.object({ type: z.literal('set-ramp'), layer: z.string(), ramp: z.array(rampPoint) }),
   z.object({ type: z.literal('set-output'), host: z.string(), port: z.number().int().positive() }),
   z.object({ type: z.literal('cue-beat') }),
   z.object({ type: z.literal('select-preset'), slot: slotIndex }),
@@ -91,48 +66,38 @@ export const controlCommand = z.discriminatedUnion('type', [
 ]);
 export type ControlCommand = z.infer<typeof controlCommand>;
 
-// The active effect's layer stack, for display: names, blend modes, and each
-// layer's palette. Static per effect today, but rides the state stream so it's
-// ready to become editable.
-export const layerMeta = z.object({
-  name: z.string(),
-  blend: z.enum(['over', 'add', 'screen', 'multiply']),
-  ramp: z.array(rampPoint).optional(),
-});
-export type LayerMeta = z.infer<typeof layerMeta>;
-
-// Current knob state, snapshotted on connect and re-emitted after every change so
-// multiple controllers stay in sync.
+// Current live state, snapshotted on connect and re-emitted after every change so
+// multiple controllers stay in sync. `layers` is the editable live stack; `params`
+// its per-layer knob/ramp state.
 export const controlState = z.object({
   type: z.literal('state'),
-  effect: demoEffectId,
   running: z.boolean(),
   speed: z.number(),
   brightness: z.number(),
   bpm: z.number(),
-  params: effectParams.optional(),
-  layers: z.array(layerMeta).optional(),
+  layers: z.array(layerDef),
+  params: layerParams,
 });
 export type ControlState = z.infer<typeof controlState>;
 
-export const effectSettings = controlState.omit({ type: true, layers: true }).partial();
+export const effectSettings = controlState.omit({ type: true }).partial();
 export type EffectSettings = z.infer<typeof effectSettings>;
 
 export const controlBeat = z.object({ type: z.literal('beat'), beat: z.number() });
 export type ControlBeat = z.infer<typeof controlBeat>;
 
-// Dev/HMR-only: a full engine snapshot (knobs + animation clock) carried across
-// a hot code swap so the running show resumes in place.
+// Dev/HMR-only: a full engine snapshot (stack + knobs + animation clock) carried
+// across a hot code swap so the running show resumes in place.
 export const effectResumeState = z.object({
-  effect: demoEffectId,
   running: z.boolean(),
   speed: z.number(),
   brightness: z.number(),
   bpm: z.number().positive(),
   phase: z.number(),
   beat: z.number(),
-  params: effectParams.optional(),
-  phases: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.number()))).optional(),
+  layers: z.array(layerDef),
+  params: layerParams.optional(),
+  phases: z.record(z.string(), z.record(z.string(), z.number())).optional(),
 });
 export type EffectResumeState = z.infer<typeof effectResumeState>;
 

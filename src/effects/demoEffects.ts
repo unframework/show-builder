@@ -1,13 +1,5 @@
 import { createNoise4D, type NoiseFunction4D } from 'simplex-noise';
-import {
-  buildLayers,
-  defineKind,
-  slot,
-  topologyRamps,
-  topologySchemas,
-  type Layer,
-  type LayerSlot,
-} from './layers';
+import { defineKind, slot, type LayerDef, type LayerKind } from './layers';
 import {
   beatSpike,
   ramp2,
@@ -44,7 +36,7 @@ export function createDemoEffectContext(): DemoEffectContext {
 }
 
 // Everything a layer kind's paint closes over, resolved once per engine build.
-interface EffectRuntime {
+export interface EffectRuntime {
   noise4D: NoiseFunction4D;
   focus: Vec3;
   strands: StrandField;
@@ -337,25 +329,6 @@ function focusWarp(x: number, y: number, z: number, focus: Vec3, zoom: number): 
   const gain = base * zoom;
   return [fx * NOISE_SCALE + dx * gain, fy * NOISE_SCALE + dy * gain, fz * NOISE_SCALE + dz * gain];
 }
-
-// Static id + label, safe to import anywhere (no context, no noise): the picker
-// and the control-message enum read these without instantiating an engine. This
-// list is the source of truth for DemoEffectId.
-export const DEMO_EFFECTS = [
-  { id: 'zone', label: 'zone colors' },
-  { id: 'lr-sweep', label: 'left → right' },
-  { id: 'rise', label: 'rise' },
-  { id: 'fb-sweep', label: 'front → back' },
-  { id: 'radial', label: 'radial pulse' },
-  { id: 'twinkle', label: 'twinkle' },
-  { id: 'noise', label: 'noise blobs' },
-  { id: 'noise-rays', label: 'noise rays' },
-  { id: 'rings', label: 'rose rings' },
-  { id: 'rising-bubbles', label: 'rising bubbles' },
-  { id: 'waveY', label: 'waveY' },
-] as const;
-
-export type DemoEffectId = (typeof DEMO_EFFECTS)[number]['id'];
 
 // The pulse layer: an LFO breath (`rate` + `swell`) plus a `flash` coverage whose
 // beat-kick gives a pure downbeat pulse. Each instance uses whichever it needs and
@@ -692,6 +665,7 @@ const RAY_FLASH_RAMP_HIGH: RampPoint = { h: 0.05, s: 0.6, l: 0.9 };
 // its ramp — the opaque base of both the bubbles wash and the noise effect.
 const noiseFieldKind = defineKind<EffectRuntime>({
   schema: FIELD_KNOBS,
+  defaultRamp: [WASH_RAMP_START, WASH_RAMP_END],
   makePaint:
     ({ noise4D, focus }) =>
     ({ xn, yn, zn }, k, ramp) => {
@@ -714,6 +688,7 @@ const noiseFieldKind = defineKind<EffectRuntime>({
 // (a black→white default screens plain brightness; any palette tints the pulse).
 const pulseKind = defineKind<EffectRuntime>({
   schema: PULSE_KNOBS,
+  defaultRamp: [PULSE_RAMP_LOW, PULSE_RAMP_HIGH],
   makePaint:
     ({ noise4D }) =>
     ({ phase }, k, ramp) => {
@@ -733,6 +708,7 @@ const pulseKind = defineKind<EffectRuntime>({
 // preserves their colour and a tinted end shades toward it. `strength` fades it.
 const heightRampKind = defineKind<EffectRuntime>({
   schema: HEIGHT_KNOBS,
+  defaultRamp: [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP],
   makePaint:
     () =>
     ({ yn }, k, ramp) => {
@@ -746,6 +722,7 @@ const heightRampKind = defineKind<EffectRuntime>({
 // soft-thresholded into coverage, tinted per strand and faded toward the tip.
 const strandBlobsKind = defineKind<EffectRuntime>({
   schema: BLOB_KNOBS,
+  defaultRamp: [BLOB_RAMP_START, BLOB_RAMP_END],
   makePaint:
     ({ noise4D, strands }) =>
     ({ index }, k, ramp) => {
@@ -768,6 +745,7 @@ const strandBlobsKind = defineKind<EffectRuntime>({
 // the opposite way, so it negates the shared scroll.
 const lrSweepKind = defineKind<EffectRuntime>({
   schema: SWEEP_KNOBS,
+  defaultRamp: LR_SWEEP_RAMP,
   makePaint:
     () =>
     ({ xn }, k, ramp) => {
@@ -779,6 +757,7 @@ const lrSweepKind = defineKind<EffectRuntime>({
 
 const riseKind = defineKind<EffectRuntime>({
   schema: SWEEP_KNOBS,
+  defaultRamp: RISE_RAMP,
   makePaint:
     () =>
     ({ yn }, k, ramp) => {
@@ -794,6 +773,7 @@ const riseKind = defineKind<EffectRuntime>({
 // beat); midpoint and sharpness shape the crest.
 const waveYKind = defineKind<EffectRuntime>({
   schema: WAVEY_KNOBS,
+  defaultRamp: WAVEY_RAMP,
   makePaint:
     () =>
     ({ yn }, k, ramp) => {
@@ -806,6 +786,7 @@ const waveYKind = defineKind<EffectRuntime>({
 
 const fbSweepKind = defineKind<EffectRuntime>({
   schema: SWEEP_KNOBS,
+  defaultRamp: FB_SWEEP_RAMP,
   makePaint:
     () =>
     ({ zn }, k, ramp) => {
@@ -817,6 +798,7 @@ const fbSweepKind = defineKind<EffectRuntime>({
 
 const radialKind = defineKind<EffectRuntime>({
   schema: SWEEP_KNOBS,
+  defaultRamp: RADIAL_RAMP,
   makePaint:
     () =>
     ({ xn, zn }, k, ramp) => {
@@ -829,6 +811,7 @@ const radialKind = defineKind<EffectRuntime>({
 
 const twinkleKind = defineKind<EffectRuntime>({
   schema: TWINKLE_KNOBS,
+  defaultRamp: TWINKLE_RAMP,
   makePaint:
     () =>
     ({ twinkleOffset }, k, ramp) => {
@@ -849,6 +832,7 @@ const twinkleKind = defineKind<EffectRuntime>({
 // sibling pulse layer.
 const raysFieldKind = defineKind<EffectRuntime>({
   schema: RAY_KNOBS,
+  defaultRamp: [RAY_RAMP_START, RAY_RAMP_END],
   makePaint: ({ noise4D, focus }) => {
     const [fx, fy, fz] = focus;
     return ({ xn, yn, zn }, k, ramp) => {
@@ -875,6 +859,7 @@ const raysFieldKind = defineKind<EffectRuntime>({
 // focus distance, shoved outward on the beat, faded to black past the reach.
 const ringsRippleKind = defineKind<EffectRuntime>({
   schema: RING_KNOBS,
+  defaultRamp: RING_RIPPLE_RAMP,
   makePaint:
     ({ rings }) =>
     ({ index, phase, beat, bpm }, k, ramp) => {
@@ -890,6 +875,7 @@ const ringsRippleKind = defineKind<EffectRuntime>({
 // The searchlight beam, blooming where the sweeping axis crosses the rings.
 const searchlightKind = defineKind<EffectRuntime>({
   schema: SEARCH_KNOBS,
+  defaultRamp: SEARCH_RAMP,
   makePaint:
     ({ rings }) =>
     ({ index, beat, bpm }, k, ramp) => {
@@ -903,110 +889,95 @@ const searchlightKind = defineKind<EffectRuntime>({
     },
 });
 
+// The building-block palette a stack references by id. Every kind stays available
+// to the layer editor even if no default look uses it; the id is the wire/persist
+// contract, so renaming a key is a migration.
+export const LAYER_KINDS = {
+  noiseField: noiseFieldKind,
+  pulse: pulseKind,
+  heightRamp: heightRampKind,
+  strandBlobs: strandBlobsKind,
+  lrSweep: lrSweepKind,
+  rise: riseKind,
+  waveY: waveYKind,
+  fbSweep: fbSweepKind,
+  radial: radialKind,
+  twinkle: twinkleKind,
+  raysField: raysFieldKind,
+  ringsRipple: ringsRippleKind,
+  searchlight: searchlightKind,
+} as const satisfies Record<string, LayerKind<EffectRuntime>>;
+export type LayerKindId = keyof typeof LAYER_KINDS;
+export const LAYER_KIND_IDS = Object.keys(LAYER_KINDS) as LayerKindId[];
+
 // Breathe and height sit under the blobs, so they colour only the wash while the
 // rising blobs stay pure on top.
-const RISING_BUBBLES: LayerSlot<EffectRuntime>[] = [
-  slot('wash', 'over', noiseFieldKind, [WASH_RAMP_START, WASH_RAMP_END]),
-  slot('breathe', 'multiply', pulseKind, [BREATHE_RAMP_LOW, BREATHE_RAMP_HIGH], {
+const RISING_BUBBLES: LayerDef[] = [
+  slot('wash', 'over', 'noiseField', [WASH_RAMP_START, WASH_RAMP_END]),
+  slot('breathe', 'multiply', 'pulse', [BREATHE_RAMP_LOW, BREATHE_RAMP_HIGH], {
     rate: { base: 1 / BREATHE_PERIOD },
     swell: { base: BREATHE_SWELL },
   }),
-  slot('height', 'multiply', heightRampKind, [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
-  slot('blobs', 'over', strandBlobsKind, [BLOB_RAMP_START, BLOB_RAMP_END]),
+  slot('height', 'multiply', 'heightRamp', [HEIGHT_RAMP_BOTTOM, HEIGHT_RAMP_TOP]),
+  slot('blobs', 'over', 'strandBlobs', [BLOB_RAMP_START, BLOB_RAMP_END]),
 ];
 
 // The standalone noise effect, decomposed like the bubbles: the shared field base
 // retuned to its own defaults, a height tint multiplied over it, and a beat
 // brightness screened on top.
-const NOISE_BLOBS: LayerSlot<EffectRuntime>[] = [
-  slot('field', 'over', noiseFieldKind, [NOISE_RAMP_START, NOISE_RAMP_END], {
+const NOISE_BLOBS: LayerDef[] = [
+  slot('field', 'over', 'noiseField', [NOISE_RAMP_START, NOISE_RAMP_END], {
     zoom: { kick: -PULSE_EXPAND },
     time: { base: NOISE_TIME },
     thresholdAt: { base: NOISE_THRESHOLD, kick: PULSE_DEPTH },
     thresholdEdge: { base: NOISE_EDGE },
   }),
-  slot('height', 'multiply', heightRampKind, [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
-  slot('bright', 'multiply', pulseKind, [NOISE_FLASH_RAMP_LOW, NOISE_FLASH_RAMP_HIGH], {
+  slot('height', 'multiply', 'heightRamp', [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
+  slot('bright', 'multiply', 'pulse', [NOISE_FLASH_RAMP_LOW, NOISE_FLASH_RAMP_HIGH], {
     flash: { kick: NOISE_KICK_LIGHT },
   }),
 ];
 
-const LR_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', lrSweepKind, LR_SWEEP_RAMP)];
-const RISE: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', riseKind, RISE_RAMP)];
-const WAVEY: LayerSlot<EffectRuntime>[] = [
-  slot('sweep', 'over', waveYKind, WAVEY_RAMP),
-  slot('sweep2', 'add', waveYKind, WAVEY_MONO_RAMP),
+const WAVEY: LayerDef[] = [
+  slot('sweep', 'over', 'waveY', WAVEY_RAMP),
+  slot('sweep2', 'add', 'waveY', WAVEY_MONO_RAMP),
 ];
-const FB_SWEEP: LayerSlot<EffectRuntime>[] = [slot('sweep', 'over', fbSweepKind, FB_SWEEP_RAMP)];
-const RADIAL: LayerSlot<EffectRuntime>[] = [slot('pulse', 'over', radialKind, RADIAL_RAMP)];
-const TWINKLE: LayerSlot<EffectRuntime>[] = [slot('twinkle', 'over', twinkleKind, TWINKLE_RAMP)];
 
 // The rays field plus its beat-brightness flash, screened on so the downbeat
 // blooms rather than tints.
-const NOISE_RAYS: LayerSlot<EffectRuntime>[] = [
-  slot('rays', 'over', raysFieldKind, [RAY_RAMP_START, RAY_RAMP_END]),
-  slot('height', 'multiply', heightRampKind, [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
-  slot('bright', 'screen', pulseKind, [RAY_FLASH_RAMP_LOW, RAY_FLASH_RAMP_HIGH], {
+const NOISE_RAYS: LayerDef[] = [
+  slot('rays', 'over', 'raysField', [RAY_RAMP_START, RAY_RAMP_END]),
+  slot('height', 'multiply', 'heightRamp', [NOISE_HEIGHT_RAMP_FLOOR, NOISE_HEIGHT_RAMP_CROWN]),
+  slot('bright', 'screen', 'pulse', [RAY_FLASH_RAMP_LOW, RAY_FLASH_RAMP_HIGH], {
     flash: { kick: RAY_KICK_LIGHT },
   }),
 ];
 
 // Ripple base with the searchlight bloomed on top.
-const RINGS: LayerSlot<EffectRuntime>[] = [
-  slot('rings', 'over', ringsRippleKind, RING_RIPPLE_RAMP),
-  slot('beam', 'screen', searchlightKind, SEARCH_RAMP),
+const RINGS: LayerDef[] = [
+  slot('rings', 'over', 'ringsRipple', RING_RIPPLE_RAMP),
+  slot('beam', 'screen', 'searchlight', SEARCH_RAMP),
 ];
 
-// Per-effect tunable knobs (base value + beat-kick amount), surfaced in the UI and
-// persisted per effect, keyed effect → layer → knob. Effects absent here have no
-// knobs.
-export const EFFECT_KNOBS: Partial<Record<DemoEffectId, Record<string, KnobSchema>>> = {
-  'lr-sweep': topologySchemas(LR_SWEEP),
-  rise: topologySchemas(RISE),
-  'fb-sweep': topologySchemas(FB_SWEEP),
-  radial: topologySchemas(RADIAL),
-  twinkle: topologySchemas(TWINKLE),
-  noise: topologySchemas(NOISE_BLOBS),
-  'noise-rays': topologySchemas(NOISE_RAYS),
-  rings: topologySchemas(RINGS),
-  'rising-bubbles': topologySchemas(RISING_BUBBLES),
-  waveY: topologySchemas(WAVEY),
-};
+// The curated stacks that seed the slot bank on first run. Each is a full look —
+// the layer topology plus its seed ramps and knob defaults live in the LayerDef[].
+export const DEFAULT_LOOKS: { name: string; layers: LayerDef[] }[] = [
+  { name: 'noise blobs', layers: NOISE_BLOBS },
+  { name: 'noise rays', layers: NOISE_RAYS },
+  { name: 'rose rings', layers: RINGS },
+  { name: 'rising bubbles', layers: RISING_BUBBLES },
+  { name: 'waveY', layers: WAVEY },
+];
 
-// Seed ramps for layers that own their ramp as runtime state; other effects keep
-// their ramp baked into paint and expose it only for display.
-export const EFFECT_RAMPS: Partial<Record<DemoEffectId, Record<string, Ramp>>> = {
-  'lr-sweep': topologyRamps(LR_SWEEP),
-  rise: topologyRamps(RISE),
-  'fb-sweep': topologyRamps(FB_SWEEP),
-  radial: topologyRamps(RADIAL),
-  twinkle: topologyRamps(TWINKLE),
-  noise: topologyRamps(NOISE_BLOBS),
-  'noise-rays': topologyRamps(NOISE_RAYS),
-  rings: topologyRamps(RINGS),
-  'rising-bubbles': topologyRamps(RISING_BUBBLES),
-  waveY: topologyRamps(WAVEY),
-};
+for (const look of DEFAULT_LOOKS)
+  for (const def of look.layers)
+    if (!(def.kind in LAYER_KINDS)) throw new Error(`unknown layer kind: ${def.kind}`);
 
-export function createDemoEffects(
+// Resolve everything a stack's paint closes over, once per engine build.
+export function createEffectRuntime(
   { noise4D }: DemoEffectContext,
   pixels: PixelDescriptor[],
   focus: Vec3,
-): Record<DemoEffectId, Layer[] | undefined> {
-  const rings = ringField(pixels, focus);
-  const strands = strandField(pixels);
-  const ctx: EffectRuntime = { noise4D, focus, strands, rings };
-  return {
-    zone: undefined,
-    'lr-sweep': buildLayers(LR_SWEEP, ctx),
-    rise: buildLayers(RISE, ctx),
-    'fb-sweep': buildLayers(FB_SWEEP, ctx),
-    radial: buildLayers(RADIAL, ctx),
-    twinkle: buildLayers(TWINKLE, ctx),
-    noise: buildLayers(NOISE_BLOBS, ctx),
-    'noise-rays': buildLayers(NOISE_RAYS, ctx),
-    rings: buildLayers(RINGS, ctx),
-    'rising-bubbles': buildLayers(RISING_BUBBLES, ctx),
-    waveY: buildLayers(WAVEY, ctx),
-  };
+): EffectRuntime {
+  return { noise4D, focus, strands: strandField(pixels), rings: ringField(pixels, focus) };
 }

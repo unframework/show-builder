@@ -78,9 +78,6 @@ export function startControlServer({
       if (!parsed.success) return;
       const cmd = parsed.data;
       switch (cmd.type) {
-        case 'set-effect':
-          source.setEffect(cmd.id);
-          break;
         case 'set-speed':
           source.setSpeed(cmd.speed);
           break;
@@ -93,11 +90,14 @@ export function startControlServer({
         case 'set-running':
           source.setRunning(cmd.running);
           break;
+        case 'set-layers':
+          source.setLayers(cmd.layers);
+          break;
         case 'set-param':
-          source.setParam(cmd.effect, cmd.layer, cmd.key, cmd.field, cmd.value);
+          source.setParam(cmd.layer, cmd.key, cmd.field, cmd.value);
           break;
         case 'set-ramp':
-          source.setRamp(cmd.effect, cmd.layer, cmd.ramp);
+          source.setRamp(cmd.layer, cmd.ramp);
           break;
         case 'set-output':
           output.setDestination(cmd.host, cmd.port);

@@ -61,7 +61,7 @@ export function usePresets(source: PresetSource | null): Presets {
         setActiveIndex(event.active);
         setArmedIndex(event.armed);
       } else if (event.type === 'state') {
-        liveLook.current = { effect: event.effect, params: event.params ?? {} };
+        liveLook.current = { layers: event.layers, params: event.params };
       }
     });
   }, [source]);

@@ -28,6 +28,9 @@ export interface Layer {
 // is deferred over the runtime ctx, so schemas derive without it.
 export interface LayerKind<Ctx> {
   schema: KnobSchema;
+  // Seeds a layer's runtime ramp when its def carries none, so every instance —
+  // including one just added in the editor — starts with an editable palette.
+  defaultRamp?: Ramp;
   makePaint: (ctx: Ctx) => Paint;
 }
 
@@ -36,15 +39,18 @@ export interface LayerKind<Ctx> {
 // (Scalar knobs only; beatRatio knobs carry their fraction in the schema.)
 export type KnobDefaults = Record<string, Partial<ScalarKnobValue>>;
 
-// One named instance of a kind in an effect's static stack: its blend, a default
-// ramp seeding runtime state, and any per-instance knob-default overrides.
-export interface LayerSlot<Ctx> {
+// One named instance of a kind in a stack: the kind referenced by a registry id
+// (so a stack serializes), its blend, a default ramp seeding runtime state, and
+// any per-instance knob-default overrides.
+export interface LayerDef {
   name: string;
   blend: BlendMode;
-  kind: LayerKind<Ctx>;
+  kind: string;
   ramp?: Ramp;
   defaults?: KnobDefaults;
 }
+
+export type KindRegistry<Ctx> = Record<string, LayerKind<Ctx>>;
 
 // Per-instance runtime state: knob values and the current ramp.
 export interface LayerState {
@@ -60,16 +66,16 @@ export interface LayerRuntime {
 
 export const defineKind = <Ctx>(kind: LayerKind<Ctx>): LayerKind<Ctx> => kind;
 
-export const slot = <Ctx>(
+export const slot = (
   name: string,
   blend: BlendMode,
-  kind: LayerKind<Ctx>,
+  kind: string,
   ramp?: Ramp,
   defaults?: KnobDefaults,
-): LayerSlot<Ctx> => ({ name, blend, kind, ramp, defaults });
+): LayerDef => ({ name, blend, kind, ramp, defaults });
 
 // Overlay per-instance starting values onto a shared schema.
-function withDefaults(schema: KnobSchema, defaults?: KnobDefaults): KnobSchema {
+export function withDefaults(schema: KnobSchema, defaults?: KnobDefaults): KnobSchema {
   if (!defaults) return schema;
   const out: KnobSchema = {};
   for (const key in schema) {
@@ -83,26 +89,29 @@ function withDefaults(schema: KnobSchema, defaults?: KnobDefaults): KnobSchema {
   return out;
 }
 
-// The effect's namespaced knob schema, keyed by instance name; knob-less kinds
-// drop out so a knob-free effect yields an empty map.
-export function topologySchemas<Ctx>(slots: LayerSlot<Ctx>[]): Record<string, KnobSchema> {
+// The stack's namespaced knob schema, keyed by instance name; knob-less and
+// unknown kinds drop out so a knob-free stack yields an empty map.
+export function defSchemas<Ctx>(
+  defs: LayerDef[],
+  reg: KindRegistry<Ctx>,
+): Record<string, KnobSchema> {
   const out: Record<string, KnobSchema> = {};
-  for (const { name, kind, defaults } of slots) {
-    if (Object.keys(kind.schema).length) out[name] = withDefaults(kind.schema, defaults);
+  for (const { name, kind, defaults } of defs) {
+    const k = reg[kind];
+    if (k && Object.keys(k.schema).length) out[name] = withDefaults(k.schema, defaults);
   }
   return out;
 }
 
-// The seed ramps that runtime state starts from, keyed by instance name.
-export function topologyRamps<Ctx>(slots: LayerSlot<Ctx>[]): Record<string, Ramp> {
-  const out: Record<string, Ramp> = {};
-  for (const { name, ramp } of slots) if (ramp) out[name] = ramp;
+// Bind each def's paint to the runtime ctx via the kind registry; unknown kinds
+// are skipped. Array order is paint order.
+export function buildDefs<Ctx>(defs: LayerDef[], reg: KindRegistry<Ctx>, ctx: Ctx): Layer[] {
+  const out: Layer[] = [];
+  for (const { name, blend, kind } of defs) {
+    const k = reg[kind];
+    if (k) out.push({ name, blend, paint: k.makePaint(ctx) });
+  }
   return out;
-}
-
-// Bind each slot's paint to the runtime ctx. Array order is paint order.
-export function buildLayers<Ctx>(slots: LayerSlot<Ctx>[], ctx: Ctx): Layer[] {
-  return slots.map(({ name, blend, kind }) => ({ name, blend, paint: kind.makePaint(ctx) }));
 }
 
 const NO_RUNTIME: LayerRuntime = { knobs: {} };

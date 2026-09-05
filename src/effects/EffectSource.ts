@@ -4,9 +4,10 @@ import {
   effectResumeState,
   type ControlState,
   type EffectEvent,
-  type EffectParams,
   type EffectResumeState,
   type EffectSettings,
+  type LayerDef,
+  type LayerParams,
   type Preset,
   type PresetsEvent,
   type Slots,
@@ -15,23 +16,31 @@ import { snapshotSignature } from '../controlHistory';
 import { emptySlots, normalizeSlots, type PresetsFile } from './presets';
 import {
   createDemoEffectContext,
-  createDemoEffects,
-  EFFECT_KNOBS,
-  EFFECT_RAMPS,
+  createEffectRuntime,
+  DEFAULT_LOOKS,
+  LAYER_KINDS,
   type DemoEffectContext,
-  type DemoEffectId,
+  type EffectRuntime,
 } from './demoEffects';
-import { paintLayers, type Layer, type LayerRuntime, type LayerState } from './layers';
-import { defaultKnobValues, kickCurve, resolveKnobs, type KnobValues } from './knobs';
+import {
+  buildDefs,
+  defSchemas,
+  paintLayers,
+  withDefaults,
+  type Layer,
+  type LayerRuntime,
+} from './layers';
+import { defaultKnobValues, kickCurve, resolveKnobs, type KnobSchema } from './knobs';
 import type { Ramp } from './stages';
 
 export type FrameSink = (universe: number, rgb: Float64Array, brightness: number) => void;
 type Listener = (event: EffectEvent) => void;
 
-// Seed a live source from persisted knobs; running is applied last so its
-// early-return can't be shadowed by an intermediate state.
+// Seed a live source from persisted settings; the stack lands before its params so
+// they attach to seeded layers, and running is applied last so its early-return
+// can't be shadowed by an intermediate state.
 export function applyEffectSettings(source: EffectSource, settings: EffectSettings): void {
-  if (settings.effect) source.setEffect(settings.effect);
+  if (settings.layers) source.setLayers(settings.layers);
   if (settings.speed !== undefined) source.setSpeed(settings.speed);
   if (settings.brightness !== undefined) source.setBrightness(settings.brightness);
   if (settings.bpm !== undefined) source.setBpm(settings.bpm);
@@ -39,21 +48,10 @@ export function applyEffectSettings(source: EffectSource, settings: EffectSettin
   if (settings.running !== undefined) source.setRunning(settings.running);
 }
 
-// A fresh copy so each emitted state has a new identity (React re-renders on it)
-// and consumers can't mutate the engine's live knob values.
-function cloneParams(params: EffectParams): EffectParams {
-  const out: EffectParams = {};
-  for (const [effect, layers] of Object.entries(params)) {
-    const layerCopy: Record<string, LayerState> = {};
-    for (const [layer, st] of Object.entries(layers)) {
-      const knobs: KnobValues = {};
-      for (const [key, v] of Object.entries(st.knobs)) knobs[key] = { ...v };
-      layerCopy[layer] = st.ramp ? { knobs, ramp: st.ramp } : { knobs };
-    }
-    out[effect] = layerCopy;
-  }
-  return out;
-}
+// Fresh copies so each emitted state has a new identity (React re-renders on it)
+// and consumers can't mutate the engine's live values.
+const cloneParams = (params: LayerParams): LayerParams => structuredClone(params);
+const cloneTopology = (defs: LayerDef[]): LayerDef[] => structuredClone(defs);
 
 // Avoid double-flash when re-cueing the beat this close to the downbeat.
 const CUE_NUDGE_MAX_SEC = 0.2;
@@ -67,21 +65,25 @@ export interface ResumeState {
   context: DemoEffectContext;
 }
 
-// Procedural frame source: the effect analogue of the relay. Iterates every
-// pixel, evaluates the selected effect at the current phase, and emits a
-// per-universe float RGB buffer plus the master brightness. Brightness and 8-bit
-// quantization happen downstream in the output stage. Environment-agnostic: a
-// driver advances it via `renderFrame`.
+// Procedural frame source: the effect analogue of the relay. Iterates every pixel,
+// composites the live layer stack at the current phase, and emits a per-universe
+// float RGB buffer plus the master brightness. Brightness and 8-bit quantization
+// happen downstream. Environment-agnostic: a driver advances it via `renderFrame`.
 export class EffectSource {
   private readonly pixels: PixelDescriptor[];
   private readonly emit: FrameSink;
   private readonly buffers = new Map<number, Float64Array>();
   private readonly listeners = new Set<Listener>();
   private readonly context: DemoEffectContext;
-  private readonly layersById: Record<DemoEffectId, Layer[] | undefined>;
+  private readonly ctx: EffectRuntime;
+  private readonly kinds = LAYER_KINDS;
 
-  private layers: Layer[] | undefined;
-  private effectId: DemoEffectId = 'zone';
+  private liveLayers: LayerDef[] = [];
+  private builtLayers: Layer[] = [];
+  private activeSchema: Record<string, KnobSchema> = {};
+  private readonly liveParams: LayerParams = {};
+  private readonly livePhases: Record<string, Record<string, number>> = {};
+
   private running = true;
   private speed = 1;
   private brightness = 1;
@@ -89,8 +91,6 @@ export class EffectSource {
   private bpm = 120;
   private beat = 0;
   private beatNudge = 0;
-  private readonly params: EffectParams = {};
-  private readonly phases: Record<string, Record<string, Record<string, number>>> = {};
 
   private slots: Slots = emptySlots();
   private active: number | null = null;
@@ -100,29 +100,7 @@ export class EffectSource {
     this.pixels = pixels;
     this.emit = emit;
     this.context = resume?.context ?? createDemoEffectContext();
-    this.layersById = createDemoEffects(this.context, pixels, focus);
-    this.layers = this.layersById[this.effectId];
-
-    for (const [id, schema] of Object.entries(EFFECT_KNOBS)) {
-      if (!schema) continue;
-      const ramps = EFFECT_RAMPS[id as DemoEffectId];
-      const layers: Record<string, LayerState> = {};
-      const acc: Record<string, Record<string, number>> = {};
-      for (const [layer, knobs] of Object.entries(schema)) {
-        const ramp = ramps?.[layer];
-        layers[layer] = ramp
-          ? { knobs: defaultKnobValues(knobs), ramp }
-          : { knobs: defaultKnobValues(knobs) };
-        const layerAcc: Record<string, number> = {};
-        for (const key in knobs) {
-          const t = knobs[key].type;
-          if (t === 'rate' || t === 'beatRatio') layerAcc[key] = 0;
-        }
-        if (Object.keys(layerAcc).length) acc[layer] = layerAcc;
-      }
-      this.params[id] = layers;
-      if (Object.keys(acc).length) this.phases[id] = acc;
-    }
+    this.ctx = createEffectRuntime(this.context, pixels, focus);
 
     const length = new Map<number, number>();
     for (const p of pixels) {
@@ -142,28 +120,27 @@ export class EffectSource {
   getState(): ControlState {
     return {
       type: 'state',
-      effect: this.effectId,
       running: this.running,
       speed: this.speed,
       brightness: this.brightness,
       bpm: this.bpm,
-      params: cloneParams(this.params),
-      layers: (this.layers ?? []).map((l) => ({ name: l.name, blend: l.blend, ramp: l.ramp })),
+      layers: cloneTopology(this.liveLayers),
+      params: cloneParams(this.liveParams),
     };
   }
 
   getResumeState(): ResumeState {
     return {
       snapshot: {
-        effect: this.effectId,
         running: this.running,
         speed: this.speed,
         brightness: this.brightness,
         bpm: this.bpm,
         phase: this.phase,
         beat: this.beat + this.beatNudge,
-        params: this.params,
-        phases: this.phases,
+        layers: cloneTopology(this.liveLayers),
+        params: this.liveParams,
+        phases: this.livePhases,
       },
       context: this.context,
     };
@@ -174,8 +151,6 @@ export class EffectSource {
     if (!parsed.success) return;
     const state = parsed.data;
 
-    this.effectId = state.effect;
-    this.layers = this.layersById[state.effect];
     this.running = state.running;
     this.speed = state.speed;
     this.brightness = state.brightness;
@@ -183,35 +158,28 @@ export class EffectSource {
     this.phase = state.phase;
     this.beat = state.beat;
     this.beatNudge = 0;
+    this.applyTopology(state.layers);
     if (state.params) this.mergeParams(state.params);
     if (state.phases) {
-      for (const [effect, layers] of Object.entries(state.phases)) {
-        const target = this.phases[effect];
-        if (!target) continue;
-        for (const [layer, acc] of Object.entries(layers)) {
-          const layerAcc = target[layer];
-          if (!layerAcc) continue;
-          for (const [key, val] of Object.entries(acc)) if (key in layerAcc) layerAcc[key] = val;
-        }
+      for (const [layer, acc] of Object.entries(state.phases)) {
+        const layerAcc = this.livePhases[layer];
+        if (!layerAcc) continue;
+        for (const [key, val] of Object.entries(acc)) if (key in layerAcc) layerAcc[key] = val;
       }
     }
   }
 
-  private mergeParams(incoming: EffectParams): void {
-    for (const [effect, layers] of Object.entries(incoming)) {
-      const target = this.params[effect];
-      if (!target) continue;
-      for (const [layer, st] of Object.entries(layers)) {
-        const tl = target[layer];
-        if (!tl) continue;
-        for (const [key, value] of Object.entries(st.knobs)) {
-          const current = tl.knobs[key];
-          // Drop values whose shape no longer matches the knob's type (a knob that
-          // switched between scalar and beatRatio across versions); keep the default.
-          if (current && 'num' in current === 'num' in value) tl.knobs[key] = { ...value };
-        }
-        if (st.ramp) tl.ramp = st.ramp;
+  private mergeParams(incoming: LayerParams): void {
+    for (const [layer, st] of Object.entries(incoming)) {
+      const tl = this.liveParams[layer];
+      if (!tl) continue;
+      for (const [key, value] of Object.entries(st.knobs)) {
+        const current = tl.knobs[key];
+        // Drop values whose shape no longer matches the knob's type (a knob that
+        // switched between scalar and beatRatio across versions); keep the default.
+        if (current && 'num' in current === 'num' in value) tl.knobs[key] = { ...value };
       }
+      if (st.ramp) tl.ramp = st.ramp;
     }
   }
 
@@ -219,11 +187,53 @@ export class EffectSource {
     for (const listener of this.listeners) listener(event);
   }
 
-  setEffect(id: DemoEffectId): void {
-    if (id === this.effectId) return;
+  // Seed a layer's runtime knobs, ramp, and phase accumulators from its kind
+  // schema. `force` reseeds even if the name already has state (new layer / kind
+  // swap); otherwise existing knob values survive a reorder or blend change.
+  private seedLayer(def: LayerDef, force = false): void {
+    const kind = this.kinds[def.kind as keyof typeof this.kinds];
+    if (!kind) return;
+    const schema = withDefaults(kind.schema, def.defaults);
+    const ramp = def.ramp ?? kind.defaultRamp;
+    if (force || !this.liveParams[def.name]) {
+      this.liveParams[def.name] = ramp
+        ? { knobs: defaultKnobValues(schema), ramp }
+        : { knobs: defaultKnobValues(schema) };
+    }
+    const acc: Record<string, number> = {};
+    for (const key in schema) {
+      const t = schema[key].type;
+      if (t === 'rate' || t === 'beatRatio') acc[key] = 0;
+    }
+    if (Object.keys(acc).length) {
+      if (force || !this.livePhases[def.name]) this.livePhases[def.name] = acc;
+    } else {
+      delete this.livePhases[def.name];
+    }
+  }
 
-    this.effectId = id;
-    this.layers = this.layersById[id];
+  private rebuildLayers(): void {
+    this.builtLayers = buildDefs(this.liveLayers, this.kinds, this.ctx);
+    this.activeSchema = defSchemas(this.liveLayers, this.kinds);
+  }
+
+  // Replace the live stack: drop unknown kinds, seed new/kind-swapped layers, and
+  // discard params for layers no longer present.
+  private applyTopology(defs: LayerDef[]): void {
+    const clean = defs.filter((d) => d.kind in this.kinds);
+    const prev = new Map(this.liveLayers.map((d) => [d.name, d]));
+    this.liveLayers = clean;
+    const names = new Set(clean.map((d) => d.name));
+    for (const def of clean) this.seedLayer(def, prev.get(def.name)?.kind !== def.kind);
+    for (const name of Object.keys(this.liveParams))
+      if (!names.has(name)) delete this.liveParams[name];
+    for (const name of Object.keys(this.livePhases))
+      if (!names.has(name)) delete this.livePhases[name];
+    this.rebuildLayers();
+  }
+
+  setLayers(layers: LayerDef[]): void {
+    this.applyTopology(layers);
     this.notify(this.getState());
     this.commitActive();
   }
@@ -256,20 +266,19 @@ export class EffectSource {
     this.notify(this.getState());
   }
 
-  setParams(params: EffectParams): void {
+  setParams(params: LayerParams): void {
     this.mergeParams(params);
     this.notify(this.getState());
     this.commitActive();
   }
 
   setParam(
-    effect: DemoEffectId,
     layer: string,
     key: string,
     field: 'base' | 'kick' | 'num' | 'den',
     value: number,
   ): void {
-    const knob = this.params[effect]?.[layer]?.knobs[key] as Record<string, number> | undefined;
+    const knob = this.liveParams[layer]?.knobs[key] as Record<string, number> | undefined;
     if (!knob || knob[field] === value) return;
 
     knob[field] = value;
@@ -277,8 +286,8 @@ export class EffectSource {
     this.commitActive();
   }
 
-  setRamp(effect: DemoEffectId, layer: string, ramp: Ramp): void {
-    const state = this.params[effect]?.[layer];
+  setRamp(layer: string, ramp: Ramp): void {
+    const state = this.liveParams[layer];
     if (!state) return;
 
     state.ramp = ramp;
@@ -306,13 +315,30 @@ export class EffectSource {
     return { type: 'presets', slots: this.cloneSlots(), active: this.active, armed: this.armed };
   }
 
-  // Seed slots from storage. The active slot mirrors the live look — already
-  // restored from settings — so trust that over whatever stale copy the store held.
+  // Seed slots from storage. On a cold start (no live look, no stored slots) seed
+  // the built-in looks and boot on the first. Otherwise adopt a slot if no live
+  // look was restored from settings, or mirror the restored look into the active
+  // slot when one was.
   hydratePresets(file: PresetsFile): void {
     this.slots = normalizeSlots(file.slots);
     this.armed = null;
     this.active = file.active !== null && this.slots[file.active] ? file.active : null;
-    if (this.active !== null) this.slots[this.active] = this.captureLook();
+
+    if (this.liveLayers.length === 0) {
+      if (this.active === null && !this.slots.some(Boolean)) {
+        this.slots = this.defaultLookSlots();
+        this.active = 0;
+      } else if (this.active === null) {
+        const first = this.slots.findIndex(Boolean);
+        this.active = first < 0 ? null : first;
+      }
+      const look = this.active !== null ? this.slots[this.active] : null;
+      if (look) this.applyLook(look);
+      this.notify(this.getState());
+    } else if (this.active !== null) {
+      this.slots[this.active] = this.captureLook();
+    }
+    this.emitPresets();
   }
 
   selectPreset(slot: number): void {
@@ -353,12 +379,12 @@ export class EffectSource {
   }
 
   private captureLook(): Preset {
-    return { effect: this.effectId, params: cloneParams(this.params) };
+    return { layers: cloneTopology(this.liveLayers), params: cloneParams(this.liveParams) };
   }
 
   private lookSig(p: Preset): string {
     return snapshotSignature({
-      effect: p.effect,
+      layers: p.layers,
       params: p.params,
       speed: 0,
       brightness: 0,
@@ -367,7 +393,32 @@ export class EffectSource {
   }
 
   private cloneSlots(): Slots {
-    return this.slots.map((s) => (s ? { effect: s.effect, params: cloneParams(s.params) } : null));
+    return this.slots.map((s) =>
+      s ? { layers: cloneTopology(s.layers), params: cloneParams(s.params) } : null,
+    );
+  }
+
+  // A look built from its stack's schema defaults, for seeding empty slots.
+  private lookFromDefaults(layers: LayerDef[]): Preset {
+    const params: LayerParams = {};
+    for (const def of layers) {
+      const kind = this.kinds[def.kind as keyof typeof this.kinds];
+      if (!kind) continue;
+      const schema = withDefaults(kind.schema, def.defaults);
+      const ramp = def.ramp ?? kind.defaultRamp;
+      params[def.name] = ramp
+        ? { knobs: defaultKnobValues(schema), ramp }
+        : { knobs: defaultKnobValues(schema) };
+    }
+    return { layers: cloneTopology(layers), params };
+  }
+
+  private defaultLookSlots(): Slots {
+    const slots = emptySlots();
+    DEFAULT_LOOKS.forEach((look, i) => {
+      if (i < slots.length) slots[i] = this.lookFromDefaults(look.layers);
+    });
+    return slots;
   }
 
   private emitPresets(): void {
@@ -382,10 +433,7 @@ export class EffectSource {
   }
 
   private applyLook(p: Preset): void {
-    if (p.effect !== this.effectId) {
-      this.effectId = p.effect;
-      this.layers = this.layersById[p.effect];
-    }
+    this.applyTopology(p.layers);
     this.mergeParams(p.params);
   }
 
@@ -406,20 +454,17 @@ export class EffectSource {
     this.emitPresets();
   }
 
-  // Resolve the active effect's knobs for this frame, per layer: base + beat-kick,
+  // Resolve the live stack's knobs for this frame, per layer: base + beat-kick,
   // then integrate any rate knobs into their running phase (advanced by dt·speed)
   // and expose that phase in place of the rate. Each layer also carries its ramp.
   private resolveActiveKnobs(dt: number, dBeat: number): Record<string, LayerRuntime> {
-    const schema = EFFECT_KNOBS[this.effectId];
-    const params = this.params[this.effectId];
-    if (!schema || !params) return {};
     const kick = kickCurve(this.beat, this.bpm);
-    const phases = this.phases[this.effectId];
     const byLayer: Record<string, LayerRuntime> = {};
-    for (const [layer, knobs] of Object.entries(schema)) {
-      const state = params[layer];
+    for (const [layer, knobs] of Object.entries(this.activeSchema)) {
+      const state = this.liveParams[layer];
+      if (!state) continue;
       const resolved = resolveKnobs(knobs, state.knobs, kick);
-      const acc = phases?.[layer];
+      const acc = this.livePhases[layer];
       if (acc) {
         for (const key in knobs) {
           const t = knobs[key].type;
@@ -455,17 +500,11 @@ export class EffectSource {
 
     this.phase += dt * this.speed;
 
-    const layers = this.layers;
+    const layers = this.builtLayers;
     const knobsByLayer = this.resolveActiveKnobs(dt, dBeat);
     for (let i = 0; i < this.pixels.length; i++) {
       const p = this.pixels[i];
       const buf = this.buffers.get(p.universe)!;
-      if (!layers) {
-        buf[p.ch0] = p.base[0];
-        buf[p.ch0 + 1] = p.base[1];
-        buf[p.ch0 + 2] = p.base[2];
-        continue;
-      }
       paintLayers(
         buf,
         p.ch0,

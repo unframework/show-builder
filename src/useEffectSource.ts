@@ -84,9 +84,6 @@ export function useEffectSource(
   // single adapter survives engine rebuilds and lets consumers key effects on it.
   return useMemo<EffectControl & PresetControl>(
     () => ({
-      setEffect: async (id) => {
-        sourceRef.current?.setEffect(id);
-      },
       setSpeed: async (speed) => {
         sourceRef.current?.setSpeed(speed);
       },
@@ -96,11 +93,14 @@ export function useEffectSource(
       setBpm: async (bpm) => {
         sourceRef.current?.setBpm(bpm);
       },
-      setParam: async (effect, layer, key, field, value) => {
-        sourceRef.current?.setParam(effect, layer, key, field, value);
+      setLayers: async (layers) => {
+        sourceRef.current?.setLayers(layers);
       },
-      setRamp: async (effect, layer, ramp) => {
-        sourceRef.current?.setRamp(effect, layer, ramp);
+      setParam: async (layer, key, field, value) => {
+        sourceRef.current?.setParam(layer, key, field, value);
+      },
+      setRamp: async (layer, ramp) => {
+        sourceRef.current?.setRamp(layer, ramp);
       },
       setRunning: async (running) => {
         sourceRef.current?.setRunning(running);

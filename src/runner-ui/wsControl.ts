@@ -52,13 +52,12 @@ export function createWsControl(url: string, handlers: WsControlHandlers): WsCon
   };
 
   return {
-    setEffect: (id) => send({ type: 'set-effect', id }),
     setSpeed: (speed) => send({ type: 'set-speed', speed }),
     setBrightness: (brightness) => send({ type: 'set-brightness', brightness }),
     setBpm: (bpm) => send({ type: 'set-bpm', bpm }),
-    setParam: (effect, layer, key, field, value) =>
-      send({ type: 'set-param', effect, layer, key, field, value }),
-    setRamp: (effect, layer, ramp) => send({ type: 'set-ramp', effect, layer, ramp }),
+    setLayers: (layers) => send({ type: 'set-layers', layers }),
+    setParam: (layer, key, field, value) => send({ type: 'set-param', layer, key, field, value }),
+    setRamp: (layer, ramp) => send({ type: 'set-ramp', layer, ramp }),
     setRunning: (running) => send({ type: 'set-running', running }),
     setOutput: (host, port) => send({ type: 'set-output', host, port }),
     cueBeat: () => send({ type: 'cue-beat' }),
